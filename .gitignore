@@ -1,0 +1,17 @@
+# Visual Studio Code
+.vscode/
+
+# Xmake cache
+.xmake/
+build/
+
+# MacOS Cache
+.DS_Store
+
+# Datas
+data/
+snapshots/
+
+# Output File
+main
+output.png
