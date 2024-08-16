@@ -167,7 +167,7 @@ void Simulator::rayMarching() {
         }
 
 
-        if (!hashFifo.isFull() && !shFifo.isFull()) {
+        if (!hash_in_Fifo.isFull() && !sh_in_Fifo.isFull()) {
 
             // Do Ray Marching
             int ray_id = featurePool.rayMarchingID;
@@ -192,14 +192,17 @@ void Simulator::rayMarching() {
 
             Vec3f pos = ray(featurePool.now_t), dir = ray.getDirection();
 
-            Hash_Reg hash;
-            SH_Reg sh;
+            Hash_in_Reg hash;
+            SH_in_Reg sh;
             hash.rayID = featurePool.rayMarchingID;
-            featurePool.HashInput = pos;
+            //featurePool.HashInput = pos;
+            hash.input = pos;
             sh.rayID = featurePool.rayMarchingID;
-            featurePool.SHInput = (dir + Vec3f(1, 1, 1)) / 2;
-            hashFifo.write(hash);
-            shFifo.write(sh);
+            sh.input = (dir + Vec3f(1, 1, 1)) / 2;
+            //featurePool.SHInput = (dir + Vec3f(1, 1, 1)) / 2;
+            
+            hash_in_Fifo.write(hash);
+            sh_in_Fifo.write(sh);
             
             featurePool.now_t += NGP_STEP_SIZE;
             waitCounter[RAYMARCHING] = latency[RAYMARCHING] - 1;
@@ -214,25 +217,25 @@ void Simulator::hashEncoding() {
     }
     else {
         if (module_state[HASHENCODING] == DONE_AN_EXECUTION) {
-            if (!sigmlpFifo.isFull()) {
-                SigMLP_Reg sigmlp;
-                sigmlp.rayID = featurePool.HashRayID;
-                sigmlpFifo.write(sigmlp);
+            if (!sigmlp_in_Fifo.isFull() && !hash_out_Fifo.isEmpty()) {
+                Hash_out_Reg hash = hash_out_Fifo.read();
+                
+                sigmlp_in_Fifo.write(SigMLP_in_Reg{hash.rayID, hash.output});
 
                 module_state[HASHENCODING] = WAIT_FOR_INPUT;
             }
             // ELSE: WAIT FOR WRITING
         }
         if (module_state[HASHENCODING] == WAIT_FOR_INPUT) {
-            if (!hashFifo.isEmpty()) {
-                Hash_Reg hash = hashFifo.read();
+            if (!hash_in_Fifo.isEmpty() && !hash_out_Fifo.isFull()) {
+                Hash_in_Reg hash = hash_in_Fifo.read();
 
-                Vec3f input_point = featurePool.HashInput;
+                //Vec3f input_point = featurePool.HashInput;
+                Vec3f input_point = hash.input;
                 Vec32f output = hash_enc->encode(input_point);
 
                 // Read Hash Input
-                featurePool.HashRayID = hash.rayID;
-                featurePool.HashOutput = output;
+                hash_out_Fifo.write(Hash_out_Reg{hash.rayID, output});
                 
                 waitCounter[HASHENCODING] = latency[HASHENCODING] - 1;
                 module_state[HASHENCODING] = DONE_AN_EXECUTION;
@@ -248,24 +251,23 @@ void Simulator::shEncoding() {
     }
     else {
         if (module_state[SHENCODING] == DONE_AN_EXECUTION) {
-            if (!colmlpFifo_SH.isFull()) {
-                Col_MLP_From_SH color;
-                color.rayID = featurePool.SHRayID;
-                colmlpFifo_SH.write(color);
+            if (!colmlpFifo_SH.isFull() && !sh_out_Fifo.isEmpty()) {
+                SH_out_Reg sh = sh_out_Fifo.read();
+                colmlpFifo_SH.write(Col_MLP_From_SH{sh.rayID, sh.output});
 
                 module_state[SHENCODING] = WAIT_FOR_INPUT;
             }
         }
         if (module_state[SHENCODING] == WAIT_FOR_INPUT) {
-            if (!shFifo.isEmpty()) {
-                SH_Reg sh = shFifo.read();
+            if (!sh_in_Fifo.isEmpty() && !sh_out_Fifo.isFull()) {
+                SH_in_Reg sh = sh_in_Fifo.read();
                 
 
-                Vec3f input_dir = featurePool.SHInput;
+                //Vec3f input_dir = featurePool.SHInput;
+                Vec3f input_dir = sh.input;
                 Vec16f output = sh_enc->encode(input_dir);
-                // Read SH Input
-                featurePool.SHRayID = sh.rayID;
-                featurePool.SHOutput = output;
+                
+                sh_out_Fifo.write(SH_out_Reg{sh.rayID, output});
 
                 waitCounter[SHENCODING] = latency[SHENCODING] - 1;
                 module_state[SHENCODING] = DONE_AN_EXECUTION;
@@ -282,23 +284,22 @@ void Simulator::sigmaMLP() {
     }
     else {
         if (module_state[SIGMAMLP] == DONE_AN_EXECUTION) {
-            if (!colmlpFifo_Hash.isFull()) {
-                Col_MLP_From_Hash color;
-                color.rayID = featurePool.SigmaRayID;
-                colmlpFifo_Hash.write(color);
+            if (!colmlpFifo_Hash.isFull() && !sigmlp_out_Fifo.isEmpty()) {
+                SigMLP_out_Reg color = sigmlp_out_Fifo.read();
+                colmlpFifo_Hash.write(Col_MLP_From_Hash{color.rayID, color.output});
 
                 module_state[SIGMAMLP] = WAIT_FOR_INPUT;
             }
         }
         if (module_state[SIGMAMLP] == WAIT_FOR_INPUT) {
-            if (!sigmlpFifo.isEmpty()) {
-                SigMLP_Reg sigmlp = sigmlpFifo.read();
+            if (!sigmlp_in_Fifo.isEmpty() && !sigmlp_out_Fifo.isFull()) {
+                SigMLP_in_Reg sigmlp = sigmlp_in_Fifo.read();
 
-                Vec32f input = featurePool.HashOutput;
+                //Vec32f input = featurePool.HashOutput;
+                Vec32f input = sigmlp.input;
                 Vec16f output = sig_mlp->inference(input);
                 
-                featurePool.SigmaRayID = sigmlp.rayID;
-                featurePool.SigmaOutput = output;
+                sigmlp_out_Fifo.write(SigMLP_out_Reg{sigmlp.rayID, output});
                 
                 waitCounter[SIGMAMLP] = latency[SIGMAMLP] - 1;
                 module_state[SIGMAMLP] = DONE_AN_EXECUTION;
@@ -315,14 +316,14 @@ void Simulator::colorMLP() {
     else {
         if (module_state[COLORMLP] == DONE_AN_EXECUTION) {
             if (!vrFifo.isFull()) {
-                featurePool.VolumeRayID = featurePool.ColorRayID;
+                
                 vrFifo.write(VR_Reg{featurePool.ColorRayID});
 
                 module_state[COLORMLP] = WAIT_FOR_INPUT;
             }
         }
         if (module_state[COLORMLP] == WAIT_FOR_INPUT) {
-            if (!colmlpFifo_Hash.isEmpty() && !colmlpFifo_SH.isEmpty()) {
+            if (!colmlpFifo_Hash.isEmpty() && !colmlpFifo_SH.isEmpty() ) {
                 Col_MLP_From_Hash color1 = colmlpFifo_Hash.read();
                 Col_MLP_From_SH color2 = colmlpFifo_SH.read();
 
@@ -333,8 +334,9 @@ void Simulator::colorMLP() {
                     exit(1);
                 }
 
-                Vec16f input1 = featurePool.SigmaOutput;
-                Vec16f input2 = featurePool.SHOutput;
+                //Vec16f input1 = featurePool.SigmaOutput;
+                //Vec16f input2 = featurePool.SHOutput;
+                Vec16f input1 = color1.input, input2 = color2.input;
                 Vec32f input = Vec32f::Zero();
                 for (int i = 0; i < 16; i++) {
                     input[i] = input1[i];
@@ -345,6 +347,7 @@ void Simulator::colorMLP() {
 
                 featurePool.ColorRayID = color1RayID;
                 featurePool.ColorOutput = Vec4f(output[0], output[1], output[2], alpha);
+                colmlp_out_Fifo.write(Col_MLP_out_Reg{color1RayID, Vec4f(output[0], output[1], output[2], alpha)});
 
                 waitCounter[COLORMLP] = latency[COLORMLP] - 1;
                 module_state[COLORMLP] = DONE_AN_EXECUTION;

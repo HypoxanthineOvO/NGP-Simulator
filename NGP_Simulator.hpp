@@ -64,10 +64,10 @@ private:
     };
     int latency[6] = {
         /* RAY MARCHING */ 1,
-        /* HASH ENCODING */ 10,
-        /* SH ENCODING */ 4,
-        /* SIGMA MLP */ 4,
-        /* COLOR MLP */ 6,
+        /* HASH ENCODING */ 1,
+        /* SH ENCODING */ 1,
+        /* SIGMA MLP */ 1,
+        /* COLOR MLP */ 1,
         /* VOLUME RENDERING */ 1
     };
     int waitCounter[6] = {
@@ -117,25 +117,40 @@ private:
     FIFO<RM_Reg> rmFifo;
     void hashEncoding();
     std::shared_ptr<HashEncoding> hash_enc;
-    struct Hash_Reg {
+    struct Hash_in_Reg {
         int rayID;
         Vec3f input;
     };
-    FIFO<Hash_Reg> hashFifo;
+    FIFO<Hash_in_Reg> hash_in_Fifo;
+    struct Hash_out_Reg {
+        int rayID;
+        Vec32f output;
+    };
+    FIFO<Hash_out_Reg> hash_out_Fifo;
     void shEncoding();
     std::shared_ptr<SHEncoding> sh_enc;
-    struct SH_Reg {
+    struct SH_in_Reg {
         int rayID;
         Vec3f input;
     };
-    FIFO<SH_Reg> shFifo;
+    FIFO<SH_in_Reg> sh_in_Fifo;
+    struct SH_out_Reg {
+        int rayID;
+        Vec16f output;
+    };
+    FIFO<SH_out_Reg> sh_out_Fifo;
     void sigmaMLP();
     std::shared_ptr<MLP> sig_mlp;
-    struct SigMLP_Reg {
+    struct SigMLP_in_Reg {
         int rayID;
         Vec32f input;
     };
-    FIFO<SigMLP_Reg> sigmlpFifo;
+    FIFO<SigMLP_in_Reg> sigmlp_in_Fifo;
+    struct SigMLP_out_Reg {
+        int rayID;
+        Vec16f output;
+    };
+    FIFO<SigMLP_out_Reg> sigmlp_out_Fifo;
     void colorMLP();
     std::shared_ptr<MLP> col_mlp;
     struct Col_MLP_From_Hash {
@@ -148,6 +163,11 @@ private:
         Vec16f input;
     };
     FIFO<Col_MLP_From_SH> colmlpFifo_SH;
+    struct Col_MLP_out_Reg {
+        int rayID;
+        Vec4f output;
+    };
+    FIFO<Col_MLP_out_Reg> colmlp_out_Fifo;
     
     void volumeRendering();
     struct VR_Reg {
