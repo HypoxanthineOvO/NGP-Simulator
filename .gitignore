@@ -14,4 +14,4 @@ snapshots/
 
 # Output File
 main
-output.png
+*.png
