@@ -109,8 +109,6 @@ private:
 
     // Note: All the fifo are input fifo.
     void rayMarching();
-    // Strategy
-    
     std::shared_ptr<Camera> camera;
     std::shared_ptr<OccupancyGrid> occupancy_grid;
     struct RM_Reg {
