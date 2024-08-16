@@ -33,8 +33,8 @@ using MatXf = Eigen::MatrixXf;
 constexpr float PI = 3.14159265358979323846f;
 constexpr float INV_PI = 0.31830988618379067154f;
 constexpr float EPS = 1e-5f;
-constexpr float RAY_DEFAULT_MIN = 0.6;
-constexpr float RAY_DEFAULT_MAX = 2.0;
+constexpr float RAY_DEFAULT_MIN = 0.1;
+constexpr float RAY_DEFAULT_MAX = 3.0;
 
 // Constants for Instant NGP
 constexpr float SQRT_3 = 1.73205080756887729352f;

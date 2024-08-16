@@ -5,11 +5,13 @@ Simulator::Simulator(): rayCount(0), MAX_RAY_COUNT(1),
  camera(nullptr), occupancy_grid(nullptr),
 hash_enc(nullptr), sh_enc(nullptr), sig_mlp(nullptr), col_mlp(nullptr) {
     // Initialize Statistics
+    history.scene_name = "Unknown";
     history.cycleCount = 0;
     history.frequency = 1;
 }
 
 Simulator::Simulator(
+        std::string Scene_Name,
         std::shared_ptr<Camera> camera,
         std::shared_ptr<OccupancyGrid> occupancy_grid,
         std::shared_ptr<MLP> sig_mlp, std::shared_ptr<MLP> color_mlp,
@@ -21,6 +23,8 @@ Simulator::Simulator(
     {
         MAX_RAY_COUNT = camera->getResolution().x() * camera->getResolution().y();
 
+        // Initialize Statistics
+        history.scene_name = Scene_Name;
         history.cycleCount = 0;
         history.rgbs.resize(camera->getResolution().x() * camera->getResolution().y());
         history.opacities.resize(camera->getResolution().x() * camera->getResolution().y());
@@ -111,10 +115,21 @@ void Simulator::render() {
         }
     }
     img->writeImgToFile("output.png");
+
+    std::shared_ptr<Image> img_depth = std::make_shared<Image>(img->getResolution().x(), img->getResolution().y());
+    for (int i = 0; i < img->getResolution().x(); i++) {
+        for (int j = 0; j < img->getResolution().y(); j++) {
+            float depth = featurePool.ts[i * img->getResolution().y() + j];
+            if (depth >= RAY_DEFAULT_MAX) depth = 0.0;
+            img_depth->setPixel(i, img->getResolution().y() - 1 - j, Vec3f(depth, depth, depth));
+        }
+    }
+    img_depth->writeImgToFile("depth.png");
 }
 
 void Simulator::printHistory() {
     puts("========== Simulation History ==========");
+    printf("Run Scene: %s\n", history.scene_name.c_str());
     printf("Simulation Frequency: %d MHz\n", history.frequency);
     printf("Cycle Count: %d\n", history.cycleCount);
     printf("Cycle Per Ray: %.6f\n", static_cast<float>(history.cycleCount) / static_cast<float>(rayCount));
@@ -126,6 +141,20 @@ void Simulator::printHistory() {
     float equ_time_to_800_800 = total_time / MAX_RAY_COUNT * 800 * 800;
     float equ_fps_to_800_800 = 1.0 / equ_time_to_800_800;
     printf("Equivalent FPS to 800x800: %.6f\n", equ_fps_to_800_800);
+
+    // Write history data to file
+    std::string freq_str = std::to_string(history.frequency);
+    std::string file_name = "History_" + freq_str + "MHz_" + history.scene_name + ".txt";
+    std::ofstream fout(file_name);
+    fout << "========== Simulation History ==========\n";
+    fout << "Run Scene: " << history.scene_name << "\n";
+    fout << "Simulation Frequency: " << history.frequency << " MHz\n";
+    fout << "Cycle Count: " << history.cycleCount << "\n";
+    fout << "Cycle Per Ray: " << static_cast<float>(history.cycleCount) / static_cast<float>(rayCount) << "\n";
+    fout << "Simulation Time: " << total_time << " s\n";
+    fout << "FPS: " << fps << "\n";
+    fout << "Equivalent FPS to 800x800: " << equ_fps_to_800_800 << "\n";
+    fout.close();
 }
 
 void Simulator::initialize() {
@@ -133,25 +162,19 @@ void Simulator::initialize() {
 
     // Ray Marching
     featurePool.rayMarchingID = 0;
-    featurePool.now_t = RAY_DEFAULT_MIN;
-    featurePool.HashInput = Vec3f::Zero();
-    featurePool.SHInput = Vec3f::Zero();
+    featurePool.ts = std::vector<float>(MAX_RAY_COUNT, RAY_DEFAULT_MIN);
     // Hash Encoding
     featurePool.HashRayID = -1;
-    featurePool.HashOutput = Vec32f::Zero();
     // SH Encoding
     featurePool.SHRayID = -1;
-    featurePool.SHOutput = Vec16f::Zero();
     // Sigma MLP
     featurePool.SigmaRayID = -1;
-    featurePool.SigmaOutput = Vec16f::Zero();
     // Color MLP
     featurePool.ColorRayID = -1;
-    featurePool.ColorOutput = Vec4f::Zero();
     // Volume Rendering
     featurePool.VolumeRayID = -1;
-    featurePool.color = Vec3f::Zero();
-    featurePool.opacity = 0.0;
+    featurePool.colors = std::vector<Vec3f>(MAX_RAY_COUNT, Vec3f::Zero());
+    featurePool.opacities = std::vector<float>(MAX_RAY_COUNT, 0.0);
 }
 
 void Simulator::rayMarching() {
@@ -162,8 +185,18 @@ void Simulator::rayMarching() {
     else {
         if (!rmFifo.isEmpty()) {
             RM_Reg rm = rmFifo.read();
-            featurePool.rayMarchingID = rm.rayID + 1; // Switch to next ray
-            featurePool.now_t = RAY_DEFAULT_MIN;
+            if (featurePool.rayMarchingID == rm.rayID) {
+                // Terminate this ray. Jump to next ray at next cycle. reset t
+                featurePool.rayMarchingID++;
+                return;
+            }
+            else if (featurePool.rayMarchingID < rm.rayID) {
+                puts("Error: Ray ID Mismatch");
+                exit(1);
+            }
+            else {
+                // Still Run this ray
+            }
         }
 
 
@@ -174,37 +207,35 @@ void Simulator::rayMarching() {
             Vec2i resolution = camera->getResolution();
             float ray_id_x = ray_id / resolution.y(), ray_id_y = ray_id % resolution.y();
             Ray ray = camera->generateRay(ray_id_x, ray_id_y);
-            // printf("Ray ID: %d, t: %f\n", featurePool.rayMarchingID, featurePool.now_t);
-            // printf("Origin: (%f, %f, %f)\n", ray.getOrigin()[0], ray.getOrigin()[1], ray.getOrigin()[2]);
-            // printf("Direction: (%f, %f, %f)\n", ray.getDirection()[0], ray.getDirection()[1], ray.getDirection()[2]);
-
-            while (!occupancy_grid->isOccupy(ray(featurePool.now_t)) && featurePool.now_t < RAY_DEFAULT_MAX + EPS) {
-                featurePool.now_t += NGP_STEP_SIZE;
+            
+            float t = featurePool.ts[ray_id];
+            while (!occupancy_grid->isOccupy(ray(t)) && t < RAY_DEFAULT_MAX + EPS) {
+                t += NGP_STEP_SIZE;
             }
 
             // If t > RAY_DEFAULT_MAX, then skip this ray
-            if (featurePool.now_t >= RAY_DEFAULT_MAX) {
+            if (t >= RAY_DEFAULT_MAX) {
                 // Write data to history
+                history.rgbs[featurePool.rayMarchingID] = featurePool.colors[featurePool.rayMarchingID];
+                history.opacities[featurePool.rayMarchingID] = featurePool.opacities[featurePool.rayMarchingID];
                 featurePool.rayMarchingID++;
-                featurePool.now_t = RAY_DEFAULT_MIN;
+                t = RAY_DEFAULT_MIN;
                 return;
             }
 
-            Vec3f pos = ray(featurePool.now_t), dir = ray.getDirection();
+            Vec3f pos = ray(t), dir = ray.getDirection();
 
             Hash_in_Reg hash;
             SH_in_Reg sh;
             hash.rayID = featurePool.rayMarchingID;
-            //featurePool.HashInput = pos;
             hash.input = pos;
             sh.rayID = featurePool.rayMarchingID;
             sh.input = (dir + Vec3f(1, 1, 1)) / 2;
-            //featurePool.SHInput = (dir + Vec3f(1, 1, 1)) / 2;
             
             hash_in_Fifo.write(hash);
             sh_in_Fifo.write(sh);
             
-            featurePool.now_t += NGP_STEP_SIZE;
+            featurePool.ts[ray_id] = t + NGP_STEP_SIZE;
             waitCounter[RAYMARCHING] = latency[RAYMARCHING] - 1;
         } 
     }
@@ -230,7 +261,6 @@ void Simulator::hashEncoding() {
             if (!hash_in_Fifo.isEmpty() && !hash_out_Fifo.isFull()) {
                 Hash_in_Reg hash = hash_in_Fifo.read();
 
-                //Vec3f input_point = featurePool.HashInput;
                 Vec3f input_point = hash.input;
                 Vec32f output = hash_enc->encode(input_point);
 
@@ -315,9 +345,10 @@ void Simulator::colorMLP() {
     }
     else {
         if (module_state[COLORMLP] == DONE_AN_EXECUTION) {
-            if (!vrFifo.isFull()) {
+            if (!vr_in_Fifo.isFull() && !colmlp_out_Fifo.isEmpty()) {
+                Col_MLP_out_Reg feature = colmlp_out_Fifo.read();
                 
-                vrFifo.write(VR_Reg{featurePool.ColorRayID});
+                vr_in_Fifo.write(VR_in_Reg{feature.rayID, feature.output});
 
                 module_state[COLORMLP] = WAIT_FOR_INPUT;
             }
@@ -334,8 +365,6 @@ void Simulator::colorMLP() {
                     exit(1);
                 }
 
-                //Vec16f input1 = featurePool.SigmaOutput;
-                //Vec16f input2 = featurePool.SHOutput;
                 Vec16f input1 = color1.input, input2 = color2.input;
                 Vec32f input = Vec32f::Zero();
                 for (int i = 0; i < 16; i++) {
@@ -345,8 +374,6 @@ void Simulator::colorMLP() {
                 Vec3f output = col_mlp->inference(input);
                 float alpha = input1[0];
 
-                featurePool.ColorRayID = color1RayID;
-                featurePool.ColorOutput = Vec4f(output[0], output[1], output[2], alpha);
                 colmlp_out_Fifo.write(Col_MLP_out_Reg{color1RayID, Vec4f(output[0], output[1], output[2], alpha)});
 
                 waitCounter[COLORMLP] = latency[COLORMLP] - 1;
@@ -363,29 +390,39 @@ void Simulator::volumeRendering() {
     }
     else {
         if (module_state[VOLUMERENDERING] == DONE_AN_EXECUTION) {
-            if (featurePool.opacity >= 0.99) {
-                // Write data to history
-                history.rgbs[featurePool.VolumeRayID] = featurePool.color;
-                history.opacities[featurePool.VolumeRayID] = featurePool.opacity;
-                // Write data to rayMarching
-                rmFifo.write(RM_Reg{featurePool.VolumeRayID});
-                featurePool.opacity = 0.0;
-                featurePool.color = Vec3f::Zero();
+            if (!vr_out_Fifo.isEmpty()) {
+                VR_out_Reg vr = vr_out_Fifo.read();
+                int rayID = vr.rayID;
+                if (featurePool.opacities[rayID] >= 0.99) {
+                    // Write data to history
+                    history.rgbs[rayID] = featurePool.colors[rayID];
+                    history.opacities[rayID] = featurePool.opacities[rayID];
+                    // Write data to rayMarching
+                    rmFifo.write(RM_Reg{rayID});
+                    module_state[VOLUMERENDERING] = WAIT_FOR_INPUT;
+                    return;
+                }
             }
+            
             module_state[VOLUMERENDERING] = WAIT_FOR_INPUT;
         }
         if (module_state[VOLUMERENDERING] == WAIT_FOR_INPUT) {
-            if (!vrFifo.isEmpty()) {
-                featurePool.VolumeRayID = vrFifo.read().rayID;
+            if (!vr_in_Fifo.isEmpty()) {
+                VR_in_Reg vr = vr_in_Fifo.read();
+                int rayID = vr.rayID;
+                float opacity = featurePool.opacities[rayID]; // TODO: FIND WHY THIS MAKE SENSE
 
-                Vec4f rgba_raw = featurePool.ColorOutput;
-                float T = 1 - featurePool.opacity;
+                Vec4f rgba_raw = vr.input;
+                float T = 1 - opacity;
                 float alpha = 1 - expf(-expf(rgba_raw[3]) * NGP_STEP_SIZE);
                 float weight = alpha * T;
                 Vec3f color = utils::sigmoid(rgba_raw.head(3));
 
-                featurePool.opacity += weight;
-                featurePool.color += weight * color;
+
+                featurePool.opacities[rayID] += weight;
+                featurePool.colors[rayID] += weight * color;
+
+                vr_out_Fifo.write(VR_out_Reg{rayID});
                 
                 waitCounter[VOLUMERENDERING] = latency[VOLUMERENDERING] - 1;
                 module_state[VOLUMERENDERING] = DONE_AN_EXECUTION;

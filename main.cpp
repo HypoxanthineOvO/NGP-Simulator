@@ -6,7 +6,7 @@
 
 
 std::string PATH = "./configs/base.json";
-int RESOLITION = 100;
+int RESOLITION = 800;
 std::string NAME = "lego";
 std::string DATA_PATH;
 int ID = 0;
@@ -63,7 +63,7 @@ int main() {
         );
     
     Simulator sim(
-        camera, ocgrid, sigma_mlp, color_mlp, hashenc, shenc
+        NAME, camera, ocgrid, sigma_mlp, color_mlp, hashenc, shenc
     );
     sim.setSimulationFrequency(200);
     sim.loadParameters("./snapshots/T_Hash19_Float/" + NAME + ".msgpack");

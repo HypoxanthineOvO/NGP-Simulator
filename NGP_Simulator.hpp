@@ -3,6 +3,8 @@
 
 
 #include <vector>
+#include <string>
+
 #include "utils.hpp"
 
 #include <camera.hpp>
@@ -14,6 +16,7 @@ class Simulator {
 public:
     Simulator();
     Simulator(
+        std::string Scene_Name,
         std::shared_ptr<Camera> camera,
         std::shared_ptr<OccupancyGrid> occupancy_grid,
         std::shared_ptr<MLP> sig_mlp, std::shared_ptr<MLP> color_mlp,
@@ -31,6 +34,7 @@ public:
 private:
     // Statistics
     struct History {
+        std::string scene_name;
         int frequency; // Frequency of the simulation. MHz
         int cycleCount;
         std::vector<Vec3f> rgbs;
@@ -64,10 +68,10 @@ private:
     };
     int latency[6] = {
         /* RAY MARCHING */ 1,
-        /* HASH ENCODING */ 1,
-        /* SH ENCODING */ 1,
-        /* SIGMA MLP */ 1,
-        /* COLOR MLP */ 1,
+        /* HASH ENCODING */ 10,
+        /* SH ENCODING */ 4,
+        /* SIGMA MLP */ 4,
+        /* COLOR MLP */ 6,
         /* VOLUME RENDERING */ 1
     };
     int waitCounter[6] = {
@@ -82,29 +86,20 @@ private:
     struct FeaturePool {
         // Ray Marching
         int rayMarchingID;
-        float now_t;
-        Vec3f HashInput;
-        Vec3f SHInput;
+        std::vector<float> ts;
         
         // Hash Encoding
         int HashRayID;
-        Vec32f HashOutput;
-        
         // SH Encoding
         int SHRayID;
-        Vec16f SHOutput;
-        
         // Sigma MLP
         int SigmaRayID;
-        Vec16f SigmaOutput;
-        
         // Color MLP
         int ColorRayID;
-        Vec4f ColorOutput; // RGB + Alpha, noticed rgb and alpha are all raw data.
         // Volume Rendering
         int VolumeRayID;
-        Vec3f color;
-        float opacity;
+        std::vector<Vec3f> colors;
+        std::vector<float> opacities;
     } featurePool;
 
     // Note: All the fifo are input fifo.
@@ -170,11 +165,15 @@ private:
     FIFO<Col_MLP_out_Reg> colmlp_out_Fifo;
     
     void volumeRendering();
-    struct VR_Reg {
+    struct VR_in_Reg {
         int rayID;
         Vec4f input;
     };
-    FIFO<VR_Reg> vrFifo;
+    FIFO<VR_in_Reg> vr_in_Fifo;
+    struct VR_out_Reg {
+        int rayID;
+    };
+    FIFO<VR_out_Reg> vr_out_Fifo;
 };
 
 
