@@ -44,6 +44,7 @@ private:
     // Process Variables
     int rayCount;
     int MAX_RAY_COUNT;
+    int MAX_T_COUNT;
 
     // Simulation Units
     enum Stage {
@@ -68,10 +69,10 @@ private:
     };
     int latency[6] = {
         /* RAY MARCHING */ 1,
-        /* HASH ENCODING */ 10,
-        /* SH ENCODING */ 4,
-        /* SIGMA MLP */ 4,
-        /* COLOR MLP */ 6,
+        /* HASH ENCODING */ 1,
+        /* SH ENCODING */ 1,
+        /* SIGMA MLP */ 1,
+        /* COLOR MLP */ 1,
         /* VOLUME RENDERING */ 1
     };
     int waitCounter[6] = {
@@ -85,7 +86,10 @@ private:
     void initialize();
     struct FeaturePool {
         // Ray Marching
+        int rayID;
         int rayMarchingID;
+        std::vector<int> valid_pixel;
+        std::vector<int> t_count;
         std::vector<float> ts;
         
         // Hash Encoding
@@ -103,6 +107,7 @@ private:
     } featurePool;
 
     // Note: All the fifo are input fifo.
+    void init_valid_pixel();
     void rayMarching();
     std::shared_ptr<Camera> camera;
     std::shared_ptr<OccupancyGrid> occupancy_grid;

@@ -22,6 +22,7 @@ Simulator::Simulator(
     hash_enc(hash_encoding), sh_enc(sh_encoding)
     {
         MAX_RAY_COUNT = camera->getResolution().x() * camera->getResolution().y();
+        MAX_T_COUNT = 16;
 
         // Initialize Statistics
         history.scene_name = Scene_Name;
@@ -100,7 +101,7 @@ void Simulator::render() {
             break;
         }
         
-        if (history.cycleCount % 10000 == 0) {
+        if (rayCount % 50000 == 1) {
             printf("Cycle Count: %d\n", history.cycleCount);
             printf("Ray Count: %d\n", rayCount);
         }
@@ -140,7 +141,9 @@ void Simulator::printHistory() {
     printf("FPS: %.6f\n", fps);
     float equ_time_to_800_800 = total_time / MAX_RAY_COUNT * 800 * 800;
     float equ_fps_to_800_800 = 1.0 / equ_time_to_800_800;
+    float equ_fps_to_1920_1080 = 1.0 / (total_time / MAX_RAY_COUNT * 1920 * 1080);
     printf("Equivalent FPS to 800x800: %.6f\n", equ_fps_to_800_800);
+    printf("Equivalent FPS to 1920x1080: %.6f\n", equ_fps_to_1920_1080);
 
     // Write history data to file
     std::string freq_str = std::to_string(history.frequency);
@@ -154,15 +157,22 @@ void Simulator::printHistory() {
     fout << "Simulation Time: " << total_time << " s\n";
     fout << "FPS: " << fps << "\n";
     fout << "Equivalent FPS to 800x800: " << equ_fps_to_800_800 << "\n";
+    fout << "Equivalent FPS to 1920x1080: " << equ_fps_to_1920_1080 << "\n";
     fout.close();
+
+    std::string call_psnr = "python ./eval.py " + history.scene_name + " " + freq_str;
+    system(call_psnr.c_str());
 }
 
 void Simulator::initialize() {
     waitCounter[RAYMARCHING] = latency[RAYMARCHING] - 1;
+    featurePool.rayID = 0;
 
     // Ray Marching
     featurePool.rayMarchingID = 0;
+    featurePool.t_count = std::vector<int>(MAX_RAY_COUNT, 0);
     featurePool.ts = std::vector<float>(MAX_RAY_COUNT, RAY_DEFAULT_MIN);
+    init_valid_pixel();
     // Hash Encoding
     featurePool.HashRayID = -1;
     // SH Encoding
@@ -177,6 +187,24 @@ void Simulator::initialize() {
     featurePool.opacities = std::vector<float>(MAX_RAY_COUNT, 0.0);
 }
 
+void Simulator::init_valid_pixel() {
+    Vec2i resolution = camera->getResolution();
+    for (int i = 0; i < resolution.x(); i++) {
+        for (int j = 0; j < resolution.y(); j++) {
+            Ray ray = camera->generateRay(i, j);
+            float t = RAY_DEFAULT_MIN;
+            while (!occupancy_grid->isOccupy(ray(t)) && t < RAY_DEFAULT_MAX + EPS) {
+                t += NGP_STEP_SIZE;
+            }
+            if (t < RAY_DEFAULT_MAX) {
+                featurePool.valid_pixel.push_back(i * resolution.y() + j);
+            }
+        }
+    }
+    float valid_pixel_ratio = static_cast<float>(featurePool.valid_pixel.size()) / static_cast<float>(MAX_RAY_COUNT);
+    printf("Valid Pixel Ratio: %.6f\n", valid_pixel_ratio);
+}
+
 void Simulator::rayMarching() {
     if (waitCounter[RAYMARCHING] > 0) {
         waitCounter[RAYMARCHING]--;
@@ -187,7 +215,8 @@ void Simulator::rayMarching() {
             RM_Reg rm = rmFifo.read();
             if (featurePool.rayMarchingID == rm.rayID) {
                 // Terminate this ray. Jump to next ray at next cycle. reset t
-                featurePool.rayMarchingID++;
+                //featurePool.rayMarchingID++;
+                featurePool.rayID++;
                 return;
             }
             else if (featurePool.rayMarchingID < rm.rayID) {
@@ -203,26 +232,34 @@ void Simulator::rayMarching() {
         if (!hash_in_Fifo.isFull() && !sh_in_Fifo.isFull()) {
 
             // Do Ray Marching
-            int ray_id = featurePool.rayMarchingID;
+            int ray_id = featurePool.rayID;
+            if (ray_id >= featurePool.valid_pixel.size()) {
+                featurePool.rayMarchingID = MAX_RAY_COUNT;
+                return;
+            }
+            int rm_id = featurePool.valid_pixel[ray_id];
+            featurePool.rayMarchingID = rm_id;
+
             Vec2i resolution = camera->getResolution();
-            float ray_id_x = ray_id / resolution.y(), ray_id_y = ray_id % resolution.y();
+            float ray_id_x = rm_id / resolution.y(), ray_id_y = rm_id % resolution.y();
             Ray ray = camera->generateRay(ray_id_x, ray_id_y);
             
-            float t = featurePool.ts[ray_id];
+            float t = featurePool.ts[rm_id];
             while (!occupancy_grid->isOccupy(ray(t)) && t < RAY_DEFAULT_MAX + EPS) {
                 t += NGP_STEP_SIZE;
             }
 
             // If t > RAY_DEFAULT_MAX, then skip this ray
-            if (t >= RAY_DEFAULT_MAX) {
+            if (t >= RAY_DEFAULT_MAX || featurePool.t_count[rm_id] >= MAX_T_COUNT) {
                 // Write data to history
                 history.rgbs[featurePool.rayMarchingID] = featurePool.colors[featurePool.rayMarchingID];
                 history.opacities[featurePool.rayMarchingID] = featurePool.opacities[featurePool.rayMarchingID];
-                featurePool.rayMarchingID++;
+                featurePool.rayID++;
                 t = RAY_DEFAULT_MIN;
                 return;
             }
 
+            featurePool.t_count[rm_id]++;
             Vec3f pos = ray(t), dir = ray.getDirection();
 
             Hash_in_Reg hash;
@@ -235,7 +272,7 @@ void Simulator::rayMarching() {
             hash_in_Fifo.write(hash);
             sh_in_Fifo.write(sh);
             
-            featurePool.ts[ray_id] = t + NGP_STEP_SIZE;
+            featurePool.ts[rm_id] = t + NGP_STEP_SIZE;
             waitCounter[RAYMARCHING] = latency[RAYMARCHING] - 1;
         } 
     }

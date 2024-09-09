@@ -16,4 +16,3 @@ void Image::writeImgToFile(const std::string& file_name){
 	stbi_flip_vertically_on_write(true);
 	stbi_write_png(file_name.c_str(), resolution.x(), resolution.y(), 3, rgb_data.data(), 0);
 }
-
