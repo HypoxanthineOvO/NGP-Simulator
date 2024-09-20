@@ -22,13 +22,15 @@ Simulator::Simulator(
     hash_enc(hash_encoding), sh_enc(sh_encoding)
     {
         MAX_RAY_COUNT = camera->getResolution().x() * camera->getResolution().y();
-        MAX_T_COUNT = 16;
+        MAX_T_COUNT = 1024;
 
         // Initialize Statistics
         history.scene_name = Scene_Name;
         history.cycleCount = 0;
         history.rgbs.resize(camera->getResolution().x() * camera->getResolution().y());
+        history.rgbs.assign(camera->getResolution().x() * camera->getResolution().y(), Vec3f::Zero());
         history.opacities.resize(camera->getResolution().x() * camera->getResolution().y());
+        history.opacities.assign(camera->getResolution().x() * camera->getResolution().y(), 0.0);
         history.frequency = 1;
     }
 
@@ -101,14 +103,23 @@ void Simulator::render() {
             break;
         }
         
-        if (rayCount % 50000 == 1) {
+        if (rayCount % 500000 == 1) {
             printf("Cycle Count: %d\n", history.cycleCount);
             printf("Ray Count: %d\n", rayCount);
         }
     }
 
-    // Write history data to image
     std::shared_ptr<Image> img = camera->getImage();
+    for (int i = 0; i < img->getResolution().x(); i++) {
+        for (int j = 0; j < img->getResolution().y(); j++) {
+            if (history.opacities[i * img->getResolution().y() + j] < featurePool.opacities[i * img->getResolution().y() + j]) {
+                history.rgbs[i * img->getResolution().y() + j] = featurePool.colors[i * img->getResolution().y() + j];
+                history.opacities[i * img->getResolution().y() + j] = featurePool.opacities[i * img->getResolution().y() + j];
+            }
+        }
+    }
+
+    // Write history data to image
     for (int i = 0; i < img->getResolution().x(); i++) {
         for (int j = 0; j < img->getResolution().y(); j++) {
             Vec3f color = history.rgbs[i * img->getResolution().y() + j];
@@ -117,15 +128,15 @@ void Simulator::render() {
     }
     img->writeImgToFile("output.png");
 
-    std::shared_ptr<Image> img_depth = std::make_shared<Image>(img->getResolution().x(), img->getResolution().y());
-    for (int i = 0; i < img->getResolution().x(); i++) {
-        for (int j = 0; j < img->getResolution().y(); j++) {
-            float depth = featurePool.ts[i * img->getResolution().y() + j];
-            if (depth >= RAY_DEFAULT_MAX) depth = 0.0;
-            img_depth->setPixel(i, img->getResolution().y() - 1 - j, Vec3f(depth, depth, depth));
-        }
-    }
-    img_depth->writeImgToFile("depth.png");
+    // std::shared_ptr<Image> img_depth = std::make_shared<Image>(img->getResolution().x(), img->getResolution().y());
+    // for (int i = 0; i < img->getResolution().x(); i++) {
+    //     for (int j = 0; j < img->getResolution().y(); j++) {
+    //         float depth = featurePool.ts[i * img->getResolution().y() + j];
+    //         if (depth >= RAY_DEFAULT_MAX) depth = 0.0;
+    //         img_depth->setPixel(i, img->getResolution().y() - 1 - j, Vec3f(depth, depth, depth));
+    //     }
+    // }
+    // img_depth->writeImgToFile("depth.png");
 }
 
 void Simulator::printHistory() {
@@ -198,6 +209,7 @@ void Simulator::init_valid_pixel() {
             }
             if (t < RAY_DEFAULT_MAX) {
                 featurePool.valid_pixel.push_back(i * resolution.y() + j);
+                featurePool.ts[i * resolution.y() + j] = t - NGP_STEP_SIZE;
             }
         }
     }
@@ -211,70 +223,76 @@ void Simulator::rayMarching() {
         return;
     }
     else {
-        if (!rmFifo.isEmpty()) {
-            RM_Reg rm = rmFifo.read();
-            if (featurePool.rayMarchingID == rm.rayID) {
-                // Terminate this ray. Jump to next ray at next cycle. reset t
-                //featurePool.rayMarchingID++;
-                featurePool.rayID++;
-                return;
-            }
-            else if (featurePool.rayMarchingID < rm.rayID) {
-                puts("Error: Ray ID Mismatch");
-                exit(1);
-            }
-            else {
-                // Still Run this ray
-            }
+        if (waitCounter[RAYMARCHING] > 0) {
+            waitCounter[RAYMARCHING] --;
         }
-
-
-        if (!hash_in_Fifo.isFull() && !sh_in_Fifo.isFull()) {
-
-            // Do Ray Marching
-            int ray_id = featurePool.rayID;
-            if (ray_id >= featurePool.valid_pixel.size()) {
-                featurePool.rayMarchingID = MAX_RAY_COUNT;
-                return;
-            }
-            int rm_id = featurePool.valid_pixel[ray_id];
-            featurePool.rayMarchingID = rm_id;
-
-            Vec2i resolution = camera->getResolution();
-            float ray_id_x = rm_id / resolution.y(), ray_id_y = rm_id % resolution.y();
-            Ray ray = camera->generateRay(ray_id_x, ray_id_y);
-            
-            float t = featurePool.ts[rm_id];
-            while (!occupancy_grid->isOccupy(ray(t)) && t < RAY_DEFAULT_MAX + EPS) {
-                t += NGP_STEP_SIZE;
+        else {
+            if (!etFifo.isEmpty()) {
+                ET_Data et_data = etFifo.read();
+                if (et_data.rayID == featurePool.rayMarchingID) {
+                    // Terminate this ray. Jump to next ray at next cycle. reset t
+                    
+                    featurePool.rayID++;
+                    waitCounter[RAYMARCHING] = latency[RAYMARCHING] - 1;
+                    return;
+                }
+                else if (et_data.rayID > featurePool.rayMarchingID) {
+                    puts("Error: Ray ID Mismatch");
+                    exit(1);
+                }
+                // Else: Still run this ray.
             }
 
-            // If t > RAY_DEFAULT_MAX, then skip this ray
-            if (t >= RAY_DEFAULT_MAX || featurePool.t_count[rm_id] >= MAX_T_COUNT) {
-                // Write data to history
-                history.rgbs[featurePool.rayMarchingID] = featurePool.colors[featurePool.rayMarchingID];
-                history.opacities[featurePool.rayMarchingID] = featurePool.opacities[featurePool.rayMarchingID];
-                featurePool.rayID++;
-                t = RAY_DEFAULT_MIN;
-                return;
-            }
+            if (!hash_in_Fifo.isFull() && !sh_in_Fifo.isFull()) {
 
-            featurePool.t_count[rm_id]++;
-            Vec3f pos = ray(t), dir = ray.getDirection();
+                // Do Ray Marching
+                int ray_id = featurePool.rayID;
+                if (ray_id >= featurePool.valid_pixel.size()) {
+                    featurePool.rayMarchingID = MAX_RAY_COUNT;
+                    return;
+                }
+                int rm_id = featurePool.valid_pixel[ray_id];
+                featurePool.rayMarchingID = rm_id;
 
-            Hash_in_Reg hash;
-            SH_in_Reg sh;
-            hash.rayID = featurePool.rayMarchingID;
-            hash.input = pos;
-            sh.rayID = featurePool.rayMarchingID;
-            sh.input = (dir + Vec3f(1, 1, 1)) / 2;
-            
-            hash_in_Fifo.write(hash);
-            sh_in_Fifo.write(sh);
-            
-            featurePool.ts[rm_id] = t + NGP_STEP_SIZE;
-            waitCounter[RAYMARCHING] = latency[RAYMARCHING] - 1;
-        } 
+                Vec2i resolution = camera->getResolution();
+                float ray_id_x = rm_id / resolution.y(), ray_id_y = rm_id % resolution.y();
+                Ray ray = camera->generateRay(ray_id_x, ray_id_y);
+                
+                float t = featurePool.ts[rm_id];
+                do {
+                    t += NGP_STEP_SIZE;
+                }
+                while (!occupancy_grid->isOccupy(ray(t)) && t < RAY_DEFAULT_MAX + EPS);
+
+                // If t > RAY_DEFAULT_MAX, then skip this ray
+                if (t >= RAY_DEFAULT_MAX || featurePool.t_count[rm_id] >= MAX_T_COUNT) {
+                    // Write data to history
+                    if (history.opacities [featurePool.rayMarchingID] < featurePool.opacities[featurePool.rayMarchingID]) {
+                        history.rgbs[featurePool.rayMarchingID] = featurePool.colors[featurePool.rayMarchingID];
+                        history.opacities[featurePool.rayMarchingID] = featurePool.opacities[featurePool.rayMarchingID];
+                    }
+                    featurePool.rayID++;
+                    //t = RAY_DEFAULT_MIN;
+                    return;
+                }
+
+                featurePool.t_count[rm_id]++;
+                Vec3f pos = ray(t), dir = ray.getDirection();
+
+                Hash_in_Reg hash;
+                SH_in_Reg sh;
+                hash.rayID = featurePool.rayMarchingID;
+                hash.input = pos;
+                sh.rayID = featurePool.rayMarchingID;
+                sh.input = (dir + Vec3f(1, 1, 1)) / 2;
+                
+                hash_in_Fifo.write(hash);
+                sh_in_Fifo.write(sh);
+                
+                featurePool.ts[rm_id] = t;// + NGP_STEP_SIZE;
+                waitCounter[RAYMARCHING] = latency[RAYMARCHING] - 1;
+            } 
+        }
     }
 }
 
@@ -427,15 +445,17 @@ void Simulator::volumeRendering() {
     }
     else {
         if (module_state[VOLUMERENDERING] == DONE_AN_EXECUTION) {
-            if (!vr_out_Fifo.isEmpty()) {
+            if (!vr_out_Fifo.isEmpty() && !etFifo.isFull()) {
                 VR_out_Reg vr = vr_out_Fifo.read();
                 int rayID = vr.rayID;
                 if (featurePool.opacities[rayID] >= 0.99) {
                     // Write data to history
-                    history.rgbs[rayID] = featurePool.colors[rayID];
-                    history.opacities[rayID] = featurePool.opacities[rayID];
-                    // Write data to rayMarching
-                    rmFifo.write(RM_Reg{rayID});
+                    if (history.opacities[rayID] < featurePool.opacities[rayID]) {
+                        history.rgbs[rayID] = featurePool.colors[rayID];
+                        history.opacities[rayID] = featurePool.opacities[rayID];
+                        // Write data to rayMarching
+                        etFifo.write(ET_Data{rayID});
+                    }
                     module_state[VOLUMERENDERING] = WAIT_FOR_INPUT;
                     return;
                 }

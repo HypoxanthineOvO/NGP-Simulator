@@ -65,8 +65,8 @@ int main() {
     Simulator sim(
         NAME, camera, ocgrid, sigma_mlp, color_mlp, hashenc, shenc
     );
-    sim.setSimulationFrequency(360);
-    sim.loadParameters("./snapshots/T_Hash19_Float/" + NAME + ".msgpack");
+    sim.setSimulationFrequency(200);
+    sim.loadParameters("./snapshots/Hash19_Float/" + NAME + ".msgpack");
     sim.render();
     sim.printHistory();
     return 0;
