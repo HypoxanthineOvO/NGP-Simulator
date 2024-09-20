@@ -111,10 +111,10 @@ private:
     void rayMarching();
     std::shared_ptr<Camera> camera;
     std::shared_ptr<OccupancyGrid> occupancy_grid;
-    struct RM_Reg {
+    struct ET_Data {
         int rayID;
     };
-    FIFO<RM_Reg> rmFifo;
+    FIFO<ET_Data> etFifo;
     void hashEncoding();
     std::shared_ptr<HashEncoding> hash_enc;
     struct Hash_in_Reg {
