@@ -10,12 +10,23 @@ int RESOLITION = 800;
 std::string NAME = "lego";
 std::string DATA_PATH;
 int ID = 0;
+int FREQUENCY = 100;
+int max_t_count = 1024;
 
-
-int main() {
+int main(int argc, char** argv) {
     std::cout << "Running Scene " << NAME << std::endl;
 
     nlohmann::json configs, camera_configs;
+
+    if (argc > 1) {
+        NAME = argv[1];
+    }
+    if (argc > 2) {
+        FREQUENCY = std::stoi(argv[2]);
+    }
+    if (argc > 3) {
+        max_t_count = std::stoi(argv[3]);
+    }
     
     std::ifstream fin;
     fin.open(PATH);
@@ -63,9 +74,9 @@ int main() {
         );
     
     Simulator sim(
-        NAME, camera, ocgrid, sigma_mlp, color_mlp, hashenc, shenc
+        NAME, camera, ocgrid, sigma_mlp, color_mlp, hashenc, shenc, max_t_count
     );
-    sim.setSimulationFrequency(200);
+    sim.setSimulationFrequency(FREQUENCY);
     sim.loadParameters("./snapshots/Hash19_Float/" + NAME + ".msgpack");
     sim.render();
     sim.printHistory();

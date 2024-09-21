@@ -20,7 +20,8 @@ public:
         std::shared_ptr<Camera> camera,
         std::shared_ptr<OccupancyGrid> occupancy_grid,
         std::shared_ptr<MLP> sig_mlp, std::shared_ptr<MLP> color_mlp,
-        std::shared_ptr<HashEncoding> hash_encoding, std::shared_ptr<SHEncoding> sh_encoding
+        std::shared_ptr<HashEncoding> hash_encoding, std::shared_ptr<SHEncoding> sh_encoding,
+        int MAX_T_COUNT = 1024
     );
 
     void loadParameters(std::string path);

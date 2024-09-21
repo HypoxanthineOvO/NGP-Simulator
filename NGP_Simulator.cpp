@@ -15,14 +15,15 @@ Simulator::Simulator(
         std::shared_ptr<Camera> camera,
         std::shared_ptr<OccupancyGrid> occupancy_grid,
         std::shared_ptr<MLP> sig_mlp, std::shared_ptr<MLP> color_mlp,
-        std::shared_ptr<HashEncoding> hash_encoding, std::shared_ptr<SHEncoding> sh_encoding
+        std::shared_ptr<HashEncoding> hash_encoding, std::shared_ptr<SHEncoding> sh_encoding,
+        int MAX_T_COUNT
 ):
     rayCount(0), camera(camera), occupancy_grid(occupancy_grid),
     sig_mlp(sig_mlp), col_mlp(color_mlp),
     hash_enc(hash_encoding), sh_enc(sh_encoding)
     {
         MAX_RAY_COUNT = camera->getResolution().x() * camera->getResolution().y();
-        MAX_T_COUNT = 1024;
+        this->MAX_T_COUNT = MAX_T_COUNT;
 
         // Initialize Statistics
         history.scene_name = Scene_Name;
@@ -97,6 +98,19 @@ void Simulator::render() {
         colorMLP();
         volumeRendering();
 
+        etFifo.update();
+        hash_in_Fifo.update();
+        hash_out_Fifo.update();
+        sh_in_Fifo.update();
+        sh_out_Fifo.update();
+        sigmlp_in_Fifo.update();
+        sigmlp_out_Fifo.update();
+        colmlpFifo_Hash.update();
+        colmlpFifo_SH.update();
+        colmlp_out_Fifo.update();
+        vr_in_Fifo.update();
+        vr_out_Fifo.update();
+
         history.cycleCount++;
         rayCount = featurePool.rayMarchingID;
         if (rayCount >= MAX_RAY_COUNT) {
@@ -127,16 +141,6 @@ void Simulator::render() {
         }
     }
     img->writeImgToFile("output.png");
-
-    // std::shared_ptr<Image> img_depth = std::make_shared<Image>(img->getResolution().x(), img->getResolution().y());
-    // for (int i = 0; i < img->getResolution().x(); i++) {
-    //     for (int j = 0; j < img->getResolution().y(); j++) {
-    //         float depth = featurePool.ts[i * img->getResolution().y() + j];
-    //         if (depth >= RAY_DEFAULT_MAX) depth = 0.0;
-    //         img_depth->setPixel(i, img->getResolution().y() - 1 - j, Vec3f(depth, depth, depth));
-    //     }
-    // }
-    // img_depth->writeImgToFile("depth.png");
 }
 
 void Simulator::printHistory() {
