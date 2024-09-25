@@ -2,13 +2,15 @@
 #define MLP_HPP_
 
 #include "utils.hpp"
+#include "FixedPoint.hpp"
 
 class MLP {
 public:
-    using Input = Eigen::VectorXf;
-    using Output = Eigen::VectorXf;
-    using Weight = Eigen::MatrixXf;
-    using act_fn = float(*)(float);
+    using DATA = float;//FixedPoint<5, 10>;
+    using Input = Eigen::Matrix<DATA, Eigen::Dynamic, 1>;
+    using Output = Eigen::Matrix<DATA, Eigen::Dynamic, 1>;
+    using Weight = Eigen::Matrix<DATA, Eigen::Dynamic, Eigen::Dynamic>;
+
     explicit MLP(int input_size, int output_size, 
         int num_of_hidden_layer, int width):
         input_size(input_size), output_size(output_size), 
@@ -27,7 +29,7 @@ public:
             utils::get_int_from_json(configs, "n_hidden_layers"),
             utils::get_int_from_json(configs, "n_neurons")){}
     
-    void loadParameters(const std::vector<float>& params);
+    void loadParameters(const std::vector<DATA>& params);
     void loadParametersFromFile(std::string path);
 
     Output inference(Input vec);
@@ -45,6 +47,7 @@ private:
     static float relu(float input){
         return std::max(0.0f, input);
     }
+
     int num_of_params = 0;
 };
 

@@ -11,7 +11,7 @@ void MLP::loadParametersFromFile(std::string path){
     loadParameters(params);
 }
 
-void MLP::loadParameters(const std::vector<float>& params){
+void MLP::loadParameters(const std::vector<DATA>& params){
     int idx = 0;
     for(int c = 0; c < layers[0].cols(); c++){
         for(int r = 0; r < layers[0].rows(); r++){
@@ -39,7 +39,7 @@ void MLP::loadParameters(const std::vector<float>& params){
 }
 
 MLP::Output MLP::inference(MLP::Input vec){
-    Eigen::MatrixXf midvec = vec;
+    MLP::Output midvec = vec;
     for(auto& layer: layers){
         midvec = layer.transpose() * midvec;
         if (&layer == &layers.back()) break;

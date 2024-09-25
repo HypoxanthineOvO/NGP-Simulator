@@ -10,7 +10,7 @@ add_requires(depends)
 target("NGP-Simulator")
     add_packages(depends, {public = true})
     set_kind("static")
-   
+
     add_includedirs({
         "Modules/Camera",
         "Modules/HashEncoding",
@@ -35,4 +35,31 @@ target("main")
 
     add_deps("NGP-Simulator")
 
+    set_targetdir(".")
+
+target("QModule")
+    add_packages(depends, {public = true})
+    set_kind("static")
+
+    add_includedirs({
+        "QModules/Camera",
+        "QModules/HashEncoding",
+        "QModules/MLP",
+        "QModules/SHEncoding",
+        "Utils/",
+        "Utils/Image"
+        }, {public = true}
+    )
+    add_files({
+        "QModules/Camera/*.cpp",
+        "QModules/HashEncoding/*.cpp",
+        "QModules/MLP/*.cpp",
+        "Utils/Image/image.cpp",
+        "QModules/SHEncoding/*.cpp"
+    })
+
+target("QModTest")
+    add_deps("QModule")
+    set_kind("binary")
+    add_files("QModuleTest.cpp")
     set_targetdir(".")
