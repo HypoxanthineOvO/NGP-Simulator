@@ -8,9 +8,21 @@ std::string to_string(float x) {
 
 int main() {
     std::shared_ptr<SHEncoding> sh_encoding = std::make_shared<SHEncoding>(4, 3);
-    std::shared_ptr<MLP> mlp = std::make_shared<MLP>(3, 16, 2, 16);
+    std::shared_ptr<MLP> mlp = std::make_shared<MLP>(3, 4, 1, 4);
+    printf("PARAMS: %d\n", mlp->getNumParams());
 
     using TestType = SHEncoding::DATA;
+
+    std::vector<TestType> params = {
+        3.1, 5.2, 4.3, 10.4, 
+        77.5, 5.6, 2.7, 0.8, 
+        1.9, 13.0, 1.1, 3.2,
+        1.3, 1.4, 2.5, 6.6,
+        3.1, 5.2, 4.3, 1.4, 
+        77.5, 5.6, 2.7, 0.8, 
+        1.9, 13.0, 1.1, 3.2
+    };
+    mlp->loadParameters(params);
 
     Vector<TestType> input_vec(3);
     input_vec(0) = 0.1;
@@ -27,8 +39,8 @@ int main() {
     //     printf("result(%d): %s\n", i, to_string(result(i)).c_str());
     // }
 
-    Eigen::Matrix<MLP::DATA, 16, 1> mlp_result = mlp->inference(result);
-    for (int i = 0; i < 16; i++) {
+    Eigen::Matrix<MLP::DATA, 4, 1> mlp_result = mlp->inference(result);
+    for (int i = 0; i < 4; i++) {
         printf("result(%d): %s\n", i, to_string(mlp_result(i)).c_str());
     }
 }

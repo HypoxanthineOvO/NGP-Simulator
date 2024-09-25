@@ -6,7 +6,7 @@
 
 class MLP {
 public:
-    using DATA = float;//FixedPoint<5, 10>;
+    using DATA = FixedPoint<10, 10>;
     using Input = Eigen::Matrix<DATA, Eigen::Dynamic, 1>;
     using Output = Eigen::Matrix<DATA, Eigen::Dynamic, 1>;
     using Weight = Eigen::Matrix<DATA, Eigen::Dynamic, Eigen::Dynamic>;
@@ -44,9 +44,9 @@ private:
     static float sigmoid(float input){
         return 1.0 / (1.0 + std::exp(-input));
     }
-    static float relu(float input){
-        return std::max(0.0f, input);
-    }
+    // static float relu(float input){
+    //     return std::max(0.0f, input);
+    // }
 
     int num_of_params = 0;
 };

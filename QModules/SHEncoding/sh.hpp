@@ -8,7 +8,7 @@
 
 class SHEncoding{
 public:
-    using DATA = float;//FixedPoint<5, 10>;
+    using DATA = FixedPoint<10, 10>;
     using Input = Eigen::Matrix<DATA, 3, 1>;
     using Output = Eigen::Matrix<DATA, 16, 1>;
     SHEncoding() = delete;
