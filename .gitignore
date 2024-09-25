@@ -16,3 +16,6 @@ snapshots/
 main
 *.png
 *.txt
+
+*result
+*Test
