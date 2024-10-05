@@ -4,13 +4,11 @@
 #include <vector>
 
 #include "utils.hpp"
-#include "FixedPoint.hpp"
 
 class SHEncoding{
 public:
-    using DATA = FixedPoint<10, 10>;
-    using Input = Eigen::Matrix<DATA, 3, 1>;
-    using Output = Eigen::Matrix<DATA, 16, 1>;
+    using Input = Eigen::Matrix<QuantNGP::RMData, 3, 1>;
+    using Output = Eigen::Matrix<QuantNGP::SHData, 16, 1>;
     SHEncoding() = delete;
     SHEncoding(const nlohmann::json& configs):
     SHEncoding(

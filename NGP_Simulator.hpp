@@ -6,6 +6,7 @@
 #include <string>
 
 #include "utils.hpp"
+#include "data_struct.hpp"
 
 #include <camera.hpp>
 #include <hash.hpp>

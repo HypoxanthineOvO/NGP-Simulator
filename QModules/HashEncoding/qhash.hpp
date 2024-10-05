@@ -8,14 +8,20 @@
 // One Layer of Multi-Hash
 class HashTable {
 public:
+    using Feature = Eigen::Matrix<QuantNGP::HashData, Eigen::Dynamic, 1>;
     explicit HashTable(long long hashtable_size, int n_feature_per_level):
         size(hashtable_size), n_feature_per_level(n_feature_per_level), 
-        table(std::vector<VecXf>(size)){};
-    void loadParameters(int index_of_hash, VecXf value){
+        table(std::vector<Feature>(size)){
+            // Initialize Table
+            for(int i = 0; i < size; i++){
+                table[i] = Feature(n_feature_per_level);
+            }
+        };
+    void loadParameters(int index_of_hash, Feature value){
         table[index_of_hash] = value;
     }
 
-    VecXf getFeature(Vec3i vertex, float non_hashing_resolution = 0.0){
+    Feature getFeature(Vec3i vertex, float non_hashing_resolution = 0.0){
         int x = vertex.x(), y = vertex.y(), z = vertex.z();
         
         int index;
@@ -32,12 +38,14 @@ public:
 private:
     long long size;
     int n_feature_per_level;
-    std::vector<VecXf> table;
+    std::vector<Feature> table;
 };
 
 class HashEncoding {
 public:
-
+    using Feature = Eigen::Matrix<QuantNGP::HashData, Eigen::Dynamic, 1>;
+    using Input = Eigen::Matrix<QuantNGP::RMData, 3, 1>;
+    using Output = Eigen::Matrix<QuantNGP::HashData, Eigen::Dynamic, 1>;
     explicit HashEncoding(const nlohmann::json& configs):
     HashEncoding(
         utils::get_int_from_json(configs, "n_features_per_level"), 
@@ -71,9 +79,9 @@ public:
             total_parameters = static_cast<int>(total_features * n_feature_per_level);
         };
     void loadParametersFromFile(std::string file);
-    void loadParameters(const std::vector<float>& params);
+    void loadParameters(const std::vector<QuantNGP::HashData>& params);
 
-    VecXf encode(Vec3f point);
+    Output encode(Input point);
 
     int getNumParams(){
         return total_parameters;

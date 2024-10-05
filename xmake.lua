@@ -29,7 +29,7 @@ target("NGP-Simulator")
     })
     add_files("NGP_Simulator.cpp")
 
-target("main")
+target("NGP-Sim")
     set_kind("binary")
     add_files("main.cpp")
 
@@ -58,7 +58,7 @@ target("QModule")
         "QModules/SHEncoding/*.cpp"
     })
 
-target("QModTest")
+target("QTest")
     add_deps("QModule")
     set_kind("binary")
     add_files("QModuleTest.cpp")

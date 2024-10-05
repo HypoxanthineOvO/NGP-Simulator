@@ -1,13 +1,13 @@
-#include "sh.hpp"
+#include "qsh.hpp"
 
 SHEncoding::Output SHEncoding::encode(SHEncoding::Input dir) {
     // Initialize sh_coeffs
     int num_of_feature = degree * degree;
     SHEncoding::Output sh_coeffs(num_of_feature);
     // Basic Direction Data
-    SHEncoding::DATA x = dir(0) * 2 - 1, y = dir(1) * 2 - 1, z = dir(2) * 2 - 1;
+    QuantNGP::SHData x = dir(0) * 2 - 1, y = dir(1) * 2 - 1, z = dir(2) * 2 - 1;
     // Combining data
-    SHEncoding::DATA x2 = x*x, y2 = y*y, z2 = z*z,
+    QuantNGP::SHData x2 = x*x, y2 = y*y, z2 = z*z,
         xy = x*y, xz = x*z, yz = y*z;
     // Encoding
     if(degree < 1 || degree > 4){

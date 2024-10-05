@@ -8,7 +8,7 @@
 #include <iostream>
 
 #include "nlohmann/json.hpp"
-
+#include "FixedPoint.hpp"
 
 
 using Vec2f = Eigen::Vector2f;
@@ -37,81 +37,8 @@ using Matrix = Eigen::Matrix<DATA_TYPE, Eigen::Dynamic, Eigen::Dynamic>;
 template <typename DATA_TYPE>
 using Vector = Eigen::Matrix<DATA_TYPE, Eigen::Dynamic, 1>;
 
-/* Activation Functions */
-// typedef enum {
-//     NONE,
-//     SIGMOID,
-//     RELU,
-//     LEAKY_RELU
-// } Activation;
-
-// // Operation on single element
-// template <typename DATA_TYPE>
-// DATA_TYPE sigmoid(DATA_TYPE x) {
-//     return 1 / (1 + exp(-x));
-// }
-// template <typename DATA_TYPE>
-// DATA_TYPE relu(DATA_TYPE x) {
-//     return x > 0 ? x : 0;
-// }
-// template <typename DATA_TYPE>
-// DATA_TYPE leaky_relu(DATA_TYPE x, DATA_TYPE alpha = 0.01) {
-//     return x > 0 ? x : alpha * x;
-// }
-// // Operation on Eigen Vector, using operation on single element
-// template <typename DATA_TYPE>
-// Vector<DATA_TYPE> sigmoid(const Vector<DATA_TYPE>& x) {
-//     Vector<DATA_TYPE> res(x.size());
-//     for (int i = 0; i < x.size(); i++) {
-//         res(i) = sigmoid(x(i));
-//     }
-//     return res;
-// }
-// template <typename DATA_TYPE>
-// Vector<DATA_TYPE> relu(const Vector<DATA_TYPE>& x) {
-//     Vector<DATA_TYPE> res(x.size());
-//     for (int i = 0; i < x.size(); i++) {
-//         res(i) = relu(x(i));
-//     }
-//     return res;
-// }
-// template <typename DATA_TYPE>
-// Vector<DATA_TYPE> leaky_relu(const Vector<DATA_TYPE>& x, DATA_TYPE alpha = 0.1) {
-//     Vector<DATA_TYPE> res(x.size());
-//     for (int i = 0; i < x.size(); i++) {
-//         res(i) = leaky_relu(x(i), alpha);
-//     }
-//     return res;
-// }
-// // Activation Function Selector
-// template <typename DATA_TYPE>
-// Vector<DATA_TYPE> Do_Activation(const Vector<DATA_TYPE>& x, Activation act) {
-//     switch (act) {
-//         case NONE:
-//             return x;
-//         case SIGMOID:
-//             return sigmoid(x);
-//         case RELU:
-//             return relu(x);
-//         case LEAKY_RELU:
-//             return leaky_relu(x);
-//         default:
-//             return Vector<DATA_TYPE>::Zero(x.size());
-//     }
-// }
-
-
-
-
-// float sigmoid(float input){
-// 	return 1.0 / (1.0 + std::exp(-input));
-// }
-// float relu(float input){
-// 	return std::max(0.0f, input);
-// }
-
 // Basic Constants
-constexpr float PI = 3.14159265358979323846f;
+constexpr float FixedPoint_PI = 3.14159265358979323846f;
 constexpr float INV_PI = 0.31830988618379067154f;
 constexpr float EPS = 1e-5f;
 constexpr float RAY_DEFAULT_MIN = 0.1;
@@ -125,65 +52,6 @@ constexpr float NGP_STEP_SIZE = SQRT_3 / NGP_STEPs;
 inline Eigen::VectorXf stdvectorToEigenVector(std::vector<float>& stdv){
     return Eigen::Map<Eigen::VectorXf>(stdv.data(), stdv.size());
 }
-
-template <typename T>
-class FIFO {
-public:
-    FIFO(): fifoSize(2) {}
-    FIFO(int size): fifoSize(size) {}
-
-    bool write(T data) {
-        if (fifo.size() < fifoSize) {
-			Upd_Buffer = std::make_shared<T>(data);
-            return true;
-        }
-		puts("FIFO is full!");
-		exit(1);
-        return false;
-    }
-    T read() {
-        T data;
-        if (fifo.size() > 0) {
-            data = fifo[0];
-            fifo.erase(fifo.begin());
-            return data;
-        }
-		puts("FIFO is empty!");
-		exit(1);
-        return data;
-    }
-	void update() {
-		if (Upd_Buffer != nullptr) {
-			fifo.push_back(*Upd_Buffer);
-			Upd_Buffer = nullptr;
-		}
-	}
-    bool isFull() {
-		full_check_cnt++;
-		if (fifo.size() == fifoSize) full_cnt++;
-        return fifo.size() == fifoSize;
-    }
-    bool isEmpty() {
-		empty_check_cnt++;
-		if (fifo.size() == 0) empty_cnt++;
-        return fifo.size() == 0;
-    }
-    void printFIFO() {
-        printf("Size: %d / %d\n", fifo.size(), fifoSize);
-		printf("Full Check: %d / %d = %f\n", full_cnt, full_check_cnt, (float)full_cnt / full_check_cnt);
-		printf("Empty Check: %d / %d = %f\n", empty_cnt, empty_check_cnt, (float)empty_cnt / empty_check_cnt);
-	}
-
-private:
-    int fifoSize;
-	std::shared_ptr<T> Upd_Buffer = nullptr;
-    std::vector<T> fifo;
-
-	// For Debug
-	int full_check_cnt = 0, empty_check_cnt = 0;
-	int full_cnt = 0, empty_cnt = 0;
-};
-
 
 namespace utils {
 
@@ -201,7 +69,7 @@ namespace utils {
 		return static_cast<uint8_t>(255.f * clamp01(radiance));
 	}
 
-	static inline float radians(float x) { return x * PI / 180; }
+	static inline float radians(float x) { return x * FixedPoint_PI / 180; }
 
 	static inline Vec3f deNan(const Vec3f& vec, float val) {
 		Vec3f tmp = vec;
@@ -275,5 +143,13 @@ namespace utils {
 		else return v2;
 	}
 }
+
+namespace QuantNGP {
+	using RMData = float;
+	using HashData = FixedPoint<10, 10>;
+	using SHData = FixedPoint<10, 10>;
+	using MLPParams = FixedPoint<10, 10>;
+	using MLPData = FixedPoint<10, 10>;
+};
 
 #endif // UTILS_HPP_
