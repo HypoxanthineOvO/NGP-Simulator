@@ -44,7 +44,7 @@ MLP::Output MLP::inference(MLP::Input vec){
         midvec = layer.transpose() * midvec;
         if (&layer == &layers.back()) break;
         for(int i = 0; i < midvec.size(); i++) {
-            midvec(i) = relu(midvec(i));
+            midvec(i) = utils::relu(midvec(i));
         }
     }
     return midvec;

@@ -11,6 +11,8 @@
 #include "FixedPoint.hpp"
 
 
+#define FIXEDPOINT
+
 using Vec2f = Eigen::Vector2f;
 using Vec2i = Eigen::Vector2i;
 
@@ -36,6 +38,9 @@ template <typename DATA_TYPE>
 using Matrix = Eigen::Matrix<DATA_TYPE, Eigen::Dynamic, Eigen::Dynamic>;
 template <typename DATA_TYPE>
 using Vector = Eigen::Matrix<DATA_TYPE, Eigen::Dynamic, 1>;
+
+
+
 
 // Basic Constants
 constexpr float FixedPoint_PI = 3.14159265358979323846f;
@@ -78,13 +83,13 @@ namespace utils {
 		if (vec.z() != vec.z()) tmp.z() = val;
 		return tmp;
 	}
-	static VecXf sigmoid(VecXf input){
-		VecXf output(input.size());
-		for(int i = 0; i < input.size(); i++){
-			output(i) = 1.0f / (1.0f + std::exp(-input(i)));
-		}
-		return output;
-	}
+	// static VecXf sigmoid(VecXf input){
+	// 	VecXf output(input.size());
+	// 	for(int i = 0; i < input.size(); i++){
+	// 		output(i) = 1.0f / (1.0f + std::exp(-input(i)));
+	// 	}
+	// 	return output;
+	// }
 
 	static inline uint32_t as_uint(const float x){
 		return *(uint32_t*)(&x);
@@ -142,14 +147,30 @@ namespace utils {
 		if (v1 > v2) return v1;
 		else return v2;
 	}
+	//#ifndef FIXEDPOINT
+	static inline float relu(float input){
+		return std::max(0.0f, input);
+	}
+	static inline float sigmoid(float input){
+		return 1.0 / (1.0 + std::exp(-input));
+	}
+	//#endif
 }
+
 
 namespace QuantNGP {
 	using RMData = float;
-	using HashData = FixedPoint<10, 10>;
-	using SHData = FixedPoint<10, 10>;
-	using MLPParams = FixedPoint<10, 10>;
-	using MLPData = FixedPoint<10, 10>;
+	#ifdef FIXEDPOINT
+	using HashData = FixedPoint<31, 32>;
+	#else
+	using HashData = float;
+	#endif
+	using SHData = HashData;
+	using MLPParams = HashData;
+	using MLPData = HashData;
+	using VRData = HashData;
+	using AlphaData = HashData;
+	using ColorData = Eigen::Matrix<AlphaData, 3, 1>;
 };
 
 #endif // UTILS_HPP_

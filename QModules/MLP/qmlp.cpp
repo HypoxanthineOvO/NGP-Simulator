@@ -4,7 +4,7 @@
 
 void MLP::loadParametersFromFile(std::string path){
     std::ifstream nfin(path);
-    std::vector<QuantNGP::MLPData> params(num_of_params);
+    std::vector<float> params(num_of_params);
     for(int i = 0; i < num_of_params; i++){
         float param;
         nfin >> param;
@@ -12,8 +12,7 @@ void MLP::loadParametersFromFile(std::string path){
     }
     loadParameters(params);
 }
-
-void MLP::loadParameters(const std::vector<QuantNGP::MLPParams>& params){
+void MLP::loadParameters(const std::vector<float>& params){
     int idx = 0;
     for(int c = 0; c < layers[0].cols(); c++){
         for(int r = 0; r < layers[0].rows(); r++){
@@ -39,15 +38,33 @@ void MLP::loadParameters(const std::vector<QuantNGP::MLPParams>& params){
         }
     }
 }
+// void MLP::loadParameters(const std::vector<QuantNGP::MLPParams>& params){
+//     int idx = 0;
+//     for(int c = 0; c < layers[0].cols(); c++){
+//         for(int r = 0; r < layers[0].rows(); r++){
+//             QuantNGP::MLPData p = params[idx++];
+//             //if(std::abs(p) < 0.032) p = 0.0f;
+//             layers[0](r, c) = p;
+//         }
+//     }
+//     for(int j = 1; j < depth; j++){
+//         for(int c = 0; c < layers[j].cols(); c++){
+//             for(int r = 0; r < layers[j].rows(); r++){
+//             QuantNGP::MLPData p = params[idx++];
+//             //if(std::abs(p) < 0.032) p = 0.0f;
+//             layers[j](r, c) = p;
+//             }
+//         }
+//     }
+//     for(int c = 0; c < layers[depth].cols(); c++){
+//         for(int r = 0; r < layers[depth].rows(); r++){      
+//             QuantNGP::MLPData p = params[idx++];
+//             //if(std::abs(p) < 0.032) p = 0.0f;  
+//             layers[depth](r, c) = p;
+//         }
+//     }
+// }
 
-MLP::Output MLP::inference(MLP::Input vec){
-    MLP::Output midvec = vec;
-    for(auto& layer: layers){
-        midvec = layer.transpose() * midvec;
-        if (&layer == &layers.back()) break;
-        for(int i = 0; i < midvec.size(); i++) {
-            midvec(i) = relu(midvec(i));
-        }
-    }
-    return midvec;
-}
+// MLP::Output MLP::inference(MLP::Input vec){
+
+// }

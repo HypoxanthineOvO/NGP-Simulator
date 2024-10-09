@@ -12,10 +12,14 @@ target("NGP-Simulator")
     set_kind("static")
 
     add_includedirs({
-        "Modules/Camera",
-        "Modules/HashEncoding",
-        "Modules/MLP",
-        "Modules/SHEncoding",
+        "QModules/Camera",
+        "QModules/HashEncoding",
+        "QModules/MLP",
+        "QModules/SHEncoding",
+        --"Modules/Camera",
+        --"Modules/HashEncoding",
+        --"Modules/MLP",
+        --"Modules/SHEncoding",
         "Utils/",
         "Utils/Image"
         }, {public = true}

@@ -12,9 +12,10 @@ int main() {
     std::shared_ptr<SHEncoding> sh_encoding = std::make_shared<SHEncoding>(4, 3);
     std::shared_ptr<MLP> mlp = std::make_shared<MLP>(3, 4, 1, 4);
     printf("PARAMS: %d\n", mlp->getNumParams());
+    std::shared_ptr<MLP> mlp_2 = std::make_shared<MLP>(5, 4, 1, 4);
 
 
-    std::vector<QuantNGP::MLPParams> mlp_params = {
+    std::vector<float> mlp_params = {
         3.1, 5.2, 4.3, 10.4, 
         77.5, 5.6, 2.7, 0.8, 
         1.9, 13.0, 1.1, 3.2,
@@ -29,6 +30,12 @@ int main() {
     input_vec(0) = 0.1;
     input_vec(1) = 0.2;
     input_vec(2) = 0.3;
+    Vector<QuantNGP::RMData> input_vec_2(5);
+    input_vec_2(0) = 0.1;
+    input_vec_2(1) = 0.3;
+    input_vec_2(2) = 0.5;
+    input_vec_2(3) = 0.7;
+    input_vec_2(4) = 0.9;
 
     for (int i = 0; i < 3; i++) {
         printf("input_vec(%d): %s\n", i, to_string(input_vec(i)).c_str());
@@ -48,5 +55,10 @@ int main() {
     Eigen::Matrix<QuantNGP::MLPData, 4, 1> mlp_result = mlp->inference(result);
     for (int i = 0; i < 4; i++) {
         printf("mlp result(%d): %s\n", i, to_string(mlp_result(i)).c_str());
+    }
+
+    Eigen::Matrix<QuantNGP::MLPData, 4, 1> mlp_result_2 = mlp_2->inference(mlp_result);
+    for (int i = 0; i < 4; i++) {
+        printf("mlp result 2(%d): %s\n", i, to_string(mlp_result_2(i)).c_str());
     }
 }

@@ -27,10 +27,25 @@ public:
             utils::get_int_from_json(configs, "n_hidden_layers"),
             utils::get_int_from_json(configs, "n_neurons")){}
     
-    void loadParameters(const std::vector<QuantNGP::MLPParams>& params);
+    void loadParameters(const std::vector<float>& params);
+    //void loadParameters(const std::vector<QuantNGP::MLPParams>& params);
     void loadParametersFromFile(std::string path);
 
-    Output inference(Input vec);
+    Output inference(Input vec) {
+        MLP::Output midvec = vec;
+        for(auto& layer: layers){
+            midvec = layer.transpose() * midvec;
+            if (&layer == &layers.back()) break;
+            for(int i = 0; i < midvec.size(); i++) {
+                #ifndef FIXEDPOINT
+                midvec(i) = utils::relu(midvec(i));
+                #else
+                midvec(i) = relu(midvec(i));
+                #endif
+            }
+        }
+        return midvec;
+    };
 
     int getNumParams(){
         return num_of_params;
@@ -39,12 +54,6 @@ public:
 private:
     int input_size, output_size, width, depth;
     std::vector<Weight> layers;
-    static float sigmoid(float input){
-        return 1.0 / (1.0 + std::exp(-input));
-    }
-    // static float relu(float input){
-    //     return std::max(0.0f, input);
-    // }
 
     int num_of_params = 0;
 };

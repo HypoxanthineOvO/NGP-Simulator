@@ -29,7 +29,7 @@ Simulator::Simulator(
         history.scene_name = Scene_Name;
         history.cycleCount = 0;
         history.rgbs.resize(camera->getResolution().x() * camera->getResolution().y());
-        history.rgbs.assign(camera->getResolution().x() * camera->getResolution().y(), Vec3f::Zero());
+        history.rgbs.assign(camera->getResolution().x() * camera->getResolution().y(), QuantNGP::ColorData::Zero());
         history.opacities.resize(camera->getResolution().x() * camera->getResolution().y());
         history.opacities.assign(camera->getResolution().x() * camera->getResolution().y(), 0.0);
         history.frequency = 1;
@@ -116,8 +116,9 @@ void Simulator::render() {
         if (rayCount >= MAX_RAY_COUNT) {
             break;
         }
-        
-        if (rayCount % 500000 == 1) {
+        //printf("Cycle Count: %d\n", history.cycleCount);
+            //printf("Ray Count: %d\n", rayCount);
+        if (rayCount % 10000 == 1) {
             printf("Cycle Count: %d\n", history.cycleCount);
             printf("Ray Count: %d\n", rayCount);
         }
@@ -136,7 +137,14 @@ void Simulator::render() {
     // Write history data to image
     for (int i = 0; i < img->getResolution().x(); i++) {
         for (int j = 0; j < img->getResolution().y(); j++) {
-            Vec3f color = history.rgbs[i * img->getResolution().y() + j];
+            Eigen::Matrix<QuantNGP::VRData, 3, 1> color_raw = history.rgbs[i * img->getResolution().y() + j];
+            #ifdef FIXEDPOINT
+            Vec3f color = Vec3f(color_raw.x().to_float(), color_raw.y().to_float(), color_raw.z().to_float());
+            printf("COLOR RAW: %s, %s, %s | ", color_raw.x().to_string().c_str(), color_raw.y().to_string().c_str(), color_raw.z().to_string().c_str());
+            #else
+            Vec3f color = Vec3f(color_raw.x(), color_raw.y(), color_raw.z());
+            #endif
+            printf("Color: %f %f %f\n", color.x(), color.y(), color.z());
             img->setPixel(i, img->getResolution().y() - 1 - j, color);
         }
     }
@@ -175,8 +183,15 @@ void Simulator::printHistory() {
     fout << "Equivalent FPS to 1920x1080: " << equ_fps_to_1920_1080 << "\n";
     fout.close();
 
-    std::string call_psnr = "python ./eval.py " + history.scene_name + " " + freq_str;
-    system(call_psnr.c_str());
+
+    // If Resolution is 800x800, then call PSNR
+    if (rayCount == 800 * 800) {
+        std::string call_psnr = "python ./eval.py " + history.scene_name + " " + freq_str;
+        system(call_psnr.c_str());
+    }
+    else {
+        puts("Resolution is not 800x800. Skip PSNR Calculation.");
+    }
 }
 
 void Simulator::initialize() {
@@ -186,7 +201,7 @@ void Simulator::initialize() {
     // Ray Marching
     featurePool.rayMarchingID = 0;
     featurePool.t_count = std::vector<int>(MAX_RAY_COUNT, 0);
-    featurePool.ts = std::vector<float>(MAX_RAY_COUNT, RAY_DEFAULT_MIN);
+    featurePool.ts = std::vector<QuantNGP::RMData>(MAX_RAY_COUNT, RAY_DEFAULT_MIN);
     init_valid_pixel();
     // Hash Encoding
     featurePool.HashRayID = -1;
@@ -198,8 +213,8 @@ void Simulator::initialize() {
     featurePool.ColorRayID = -1;
     // Volume Rendering
     featurePool.VolumeRayID = -1;
-    featurePool.colors = std::vector<Vec3f>(MAX_RAY_COUNT, Vec3f::Zero());
-    featurePool.opacities = std::vector<float>(MAX_RAY_COUNT, 0.0);
+    featurePool.colors = std::vector<Eigen::Matrix<QuantNGP::MLPData, 3, 1> >(MAX_RAY_COUNT, Eigen::Matrix<QuantNGP::MLPData, 3, 1>::Zero());
+    featurePool.opacities = std::vector<QuantNGP::MLPData>(MAX_RAY_COUNT, 0.0);
 }
 
 void Simulator::init_valid_pixel() {
@@ -320,8 +335,8 @@ void Simulator::hashEncoding() {
             if (!hash_in_Fifo.isEmpty() && !hash_out_Fifo.isFull()) {
                 Hash_in_Reg hash = hash_in_Fifo.read();
 
-                Vec3f input_point = hash.input;
-                Vec32f output = hash_enc->encode(input_point);
+                HashInput input_point = hash.input;
+                HashOutput output = hash_enc->encode(input_point);
 
                 // Read Hash Input
                 hash_out_Fifo.write(Hash_out_Reg{hash.rayID, output});
@@ -353,8 +368,8 @@ void Simulator::shEncoding() {
                 
 
                 //Vec3f input_dir = featurePool.SHInput;
-                Vec3f input_dir = sh.input;
-                Vec16f output = sh_enc->encode(input_dir);
+                SHInput input_dir = sh.input;
+                SHOutput output = sh_enc->encode(input_dir);
                 
                 sh_out_Fifo.write(SH_out_Reg{sh.rayID, output});
 
@@ -385,8 +400,8 @@ void Simulator::sigmaMLP() {
                 SigMLP_in_Reg sigmlp = sigmlp_in_Fifo.read();
 
                 //Vec32f input = featurePool.HashOutput;
-                Vec32f input = sigmlp.input;
-                Vec16f output = sig_mlp->inference(input);
+                SigMLPInput input = sigmlp.input;
+                SigMLPOutput output = sig_mlp->inference(input);
                 
                 sigmlp_out_Fifo.write(SigMLP_out_Reg{sigmlp.rayID, output});
                 
@@ -424,16 +439,17 @@ void Simulator::colorMLP() {
                     exit(1);
                 }
 
-                Vec16f input1 = color1.input, input2 = color2.input;
-                Vec32f input = Vec32f::Zero();
+                ColMLPInput input1 = color1.input, input2 = color2.input;
+                Eigen::Matrix<QuantNGP::MLPData, 32, 1> input;
                 for (int i = 0; i < 16; i++) {
                     input[i] = input1[i];
                     input[i + 16] = input2[i];
                 }
-                Vec3f output = col_mlp->inference(input);
-                float alpha = input1[0];
+                QuantNGP::ColorData output = col_mlp->inference(input);
+                QuantNGP::AlphaData alpha = input1[0];
 
-                colmlp_out_Fifo.write(Col_MLP_out_Reg{color1RayID, Vec4f(output[0], output[1], output[2], alpha)});
+
+                colmlp_out_Fifo.write(Col_MLP_out_Reg{color1RayID, ColMLPOutput(output[0], output[1], output[2], alpha)});
 
                 waitCounter[COLORMLP] = latency[COLORMLP] - 1;
                 module_state[COLORMLP] = DONE_AN_EXECUTION;
@@ -471,14 +487,19 @@ void Simulator::volumeRendering() {
             if (!vr_in_Fifo.isEmpty()) {
                 VR_in_Reg vr = vr_in_Fifo.read();
                 int rayID = vr.rayID;
-                float opacity = featurePool.opacities[rayID]; // TODO: FIND WHY THIS MAKE SENSE
+                QuantNGP::VRData opacity = featurePool.opacities[rayID]; // TODO: FIND WHY THIS MAKE SENSE
 
-                Vec4f rgba_raw = vr.input;
-                float T = 1 - opacity;
-                float alpha = 1 - expf(-expf(rgba_raw[3]) * NGP_STEP_SIZE);
-                float weight = alpha * T;
-                Vec3f color = utils::sigmoid(rgba_raw.head(3));
-
+                Eigen::Matrix<QuantNGP::MLPData, 4, 1> rgba_raw = vr.input;
+                QuantNGP::VRData T = 1 - opacity;
+                QuantNGP::VRData alpha = 1 - exp(-exp(rgba_raw[3]) * NGP_STEP_SIZE);
+                QuantNGP::VRData weight = alpha * T;
+                #ifndef FIXEDPOINT
+                QuantNGP::ColorData color = QuantNGP::ColorData(utils::sigmoid(rgba_raw.x()), utils::sigmoid(rgba_raw.y()), utils::sigmoid(rgba_raw.z()));
+                #else
+                QuantNGP::ColorData color = QuantNGP::ColorData(sigmoid(rgba_raw.x()), sigmoid(rgba_raw.y()), sigmoid(rgba_raw.z()));
+                #endif
+                //QuantNGP::ColorData color = QuantNGP::ColorData(rgba_raw.x(), rgba_raw.y(), rgba_raw.z());
+                
 
                 featurePool.opacities[rayID] += weight;
                 featurePool.colors[rayID] += weight * color;

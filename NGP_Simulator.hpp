@@ -9,9 +9,9 @@
 #include "data_struct.hpp"
 
 #include <camera.hpp>
-#include <hash.hpp>
-#include <sh.hpp>
-#include <mlp.hpp>
+#include <qhash.hpp>
+#include <qsh.hpp>
+#include <qmlp.hpp>
 
 class Simulator {
 public:
@@ -39,8 +39,8 @@ private:
         std::string scene_name;
         int frequency; // Frequency of the simulation. MHz
         int cycleCount;
-        std::vector<Vec3f> rgbs;
-        std::vector<float> opacities;
+        std::vector<Eigen::Matrix<QuantNGP::MLPData, 3, 1>> rgbs;
+        std::vector<QuantNGP::MLPData> opacities;
     } history;
 
     // Process Variables
@@ -92,7 +92,7 @@ private:
         int rayMarchingID;
         std::vector<int> valid_pixel;
         std::vector<int> t_count;
-        std::vector<float> ts;
+        std::vector<QuantNGP::RMData> ts;
         
         // Hash Encoding
         int HashRayID;
@@ -104,11 +104,22 @@ private:
         int ColorRayID;
         // Volume Rendering
         int VolumeRayID;
-        std::vector<Vec3f> colors;
-        std::vector<float> opacities;
+        std::vector<Eigen::Matrix<QuantNGP::MLPData, 3, 1>> colors;
+        std::vector<QuantNGP::MLPData> opacities;
     } featurePool;
 
     // Note: All the fifo are input fifo.
+    using HashInput = Eigen::Matrix<QuantNGP::RMData, 3, 1>;
+    using HashOutput = Eigen::Matrix<QuantNGP::HashData, 32, 1>;
+    using SHInput = Eigen::Matrix<QuantNGP::RMData, 3, 1>;
+    using SHOutput = Eigen::Matrix<QuantNGP::SHData, 16, 1>;
+    using SigMLPInput = HashOutput;
+    using SigMLPOutput = Eigen::Matrix<QuantNGP::MLPData, 16, 1>;
+    using ColMLPInput = Eigen::Matrix<QuantNGP::MLPData, 16, 1>;
+    using ColMLPOutput = Eigen::Matrix<QuantNGP::MLPData, 4, 1>;
+    using VRInput = ColMLPOutput;
+    using VROutput = Eigen::Matrix<QuantNGP::MLPData, 4, 1>;
+
     void init_valid_pixel();
     void rayMarching();
     std::shared_ptr<Camera> camera;
@@ -121,60 +132,60 @@ private:
     std::shared_ptr<HashEncoding> hash_enc;
     struct Hash_in_Reg {
         int rayID;
-        Vec3f input;
+        HashInput input;
     };
     FIFO<Hash_in_Reg> hash_in_Fifo;
     struct Hash_out_Reg {
         int rayID;
-        Vec32f output;
+        HashOutput output;
     };
     FIFO<Hash_out_Reg> hash_out_Fifo;
     void shEncoding();
     std::shared_ptr<SHEncoding> sh_enc;
     struct SH_in_Reg {
         int rayID;
-        Vec3f input;
+        SHInput input;
     };
     FIFO<SH_in_Reg> sh_in_Fifo;
     struct SH_out_Reg {
         int rayID;
-        Vec16f output;
+        SHOutput output;
     };
     FIFO<SH_out_Reg> sh_out_Fifo;
     void sigmaMLP();
     std::shared_ptr<MLP> sig_mlp;
     struct SigMLP_in_Reg {
         int rayID;
-        Vec32f input;
+        SigMLPInput input;
     };
     FIFO<SigMLP_in_Reg> sigmlp_in_Fifo;
     struct SigMLP_out_Reg {
         int rayID;
-        Vec16f output;
+        SigMLPOutput output;
     };
     FIFO<SigMLP_out_Reg> sigmlp_out_Fifo;
     void colorMLP();
     std::shared_ptr<MLP> col_mlp;
     struct Col_MLP_From_Hash {
         int rayID;
-        Vec16f input;
+        ColMLPInput input;
     };
     FIFO<Col_MLP_From_Hash> colmlpFifo_Hash;
     struct Col_MLP_From_SH {
         int rayID;
-        Vec16f input;
+        ColMLPInput input;
     };
     FIFO<Col_MLP_From_SH> colmlpFifo_SH;
     struct Col_MLP_out_Reg {
         int rayID;
-        Vec4f output;
+        ColMLPOutput output;
     };
     FIFO<Col_MLP_out_Reg> colmlp_out_Fifo;
     
     void volumeRendering();
     struct VR_in_Reg {
         int rayID;
-        Vec4f input;
+        VRInput input;
     };
     FIFO<VR_in_Reg> vr_in_Fifo;
     struct VR_out_Reg {

@@ -670,6 +670,12 @@ public:
         return is;
     }
 
+    float to_float() const {
+        // Translate the FixedPoint to float value
+        float val = static_cast<float>(int_value);
+        float frac = static_cast<float>(frac_value) / (1 << frac_length);
+        return sign ? -(val + frac) : val + frac;
+    }
 private:
     const float SIN_PI_X = 0;
     const float COS_PI_X = -1;

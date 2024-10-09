@@ -79,7 +79,8 @@ public:
             total_parameters = static_cast<int>(total_features * n_feature_per_level);
         };
     void loadParametersFromFile(std::string file);
-    void loadParameters(const std::vector<QuantNGP::HashData>& params);
+    void loadParameters(const std::vector<float>& params);
+    //void loadParameters(const std::vector<QuantNGP::HashData>& params);
 
     Output encode(Input point);
 

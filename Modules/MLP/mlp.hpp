@@ -39,12 +39,7 @@ public:
 private:
     int input_size, output_size, width, depth;
     std::vector<Weight> layers;
-    static float sigmoid(float input){
-        return 1.0 / (1.0 + std::exp(-input));
-    }
-    static float relu(float input){
-        return std::max(0.0f, input);
-    }
+    
     int num_of_params = 0;
 };
 
