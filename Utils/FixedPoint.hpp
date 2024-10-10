@@ -498,15 +498,6 @@ public:
         // Get the sign of the result
         bool new_sign = sign ^ other.sign;
 
-        // Check for overflow
-        if (int_value >= (1 << (int_length - 1)) || other.int_value >= (1 << (int_length - 1))) {
-            puts("Multiply Integer overflow!");
-            printf("%s * %s\n", to_string().c_str(), other.to_string().c_str());
-            
-            // Just return the max value
-            printf("JUST RETURN %s\n", FixedPoint(new_sign, int_mask, frac_mask).to_string().c_str());
-            return FixedPoint(new_sign, int_mask, frac_mask);
-        }
 
         uint64_t self_val = (int_value << frac_length) | frac_value,
                  other_val =  (other.int_value << frac_length) | other.frac_value;
@@ -524,15 +515,7 @@ public:
             return FixedPoint(0);
         }
         bool new_sign = sign ^ (other_val < 0);
-        // Check for overflow
-        if (int_value >= (1 << (int_length - 1)) || other_val >= (1 << (int_length - 1))) {
-            puts("Multiply Integer overflow!");
-            printf("%s * %d\n", to_string().c_str(), other_val);
-            //exit(1);
-            // Just return the max value
-            printf("JUST RETURN %s\n", FixedPoint(new_sign, int_mask, frac_mask).to_string().c_str());
-            return FixedPoint(new_sign, int_mask, frac_mask);
-        }
+
         uint64_t self_val = (int_value << frac_length) | frac_value;
         __uint128_t self_val_128 = self_val;
         __uint128_t new_val = self_val_128 * (other_val << frac_length);
