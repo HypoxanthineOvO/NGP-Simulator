@@ -27,6 +27,12 @@ public:
     FixedPoint(float val): 
         int_length(integer), frac_length(fraction),
         int_mask((1 << integer) - 1), frac_mask((1 << fraction) - 1) {
+        // Check for initialize overflow
+        if (std::abs(val) >= (1 << (integer))) {
+            puts("Initialize overflow!");
+            printf("Initialize value: %f, but the max value is %f\n", val, (1 << (integer)));
+            exit(1);
+        }
         sign = (val < 0);
         float abs_val = std::abs(val);
         float val_int = std::floor(abs_val), val_frac = abs_val - val_int;
@@ -38,9 +44,15 @@ public:
         int_value &= int_mask;
         frac_value &= frac_mask;
     };
-    FixedPoint(double val): 
+    FixedPoint(double val):
         int_length(integer), frac_length(fraction),
         int_mask((1 << integer) - 1), frac_mask((1 << fraction) - 1) {
+        // Check for initialize overflow
+        if (std::abs(val) >= (double)(1 << (integer))) {
+            puts("Initialize overflow!");
+            printf("Initialize value: %lf, but the max value is %lf\n", val, (1 << (integer)));
+            exit(1);
+        }
         sign = (val < 0);
         double abs_val = std::abs(val);
         double val_int = std::floor(abs_val), val_frac = abs_val - val_int;
@@ -479,8 +491,22 @@ public:
 
     // Multiplication
     FixedPoint mul(const FixedPoint& other) const {
+        // Check for one of the value is 0
+        if ((int_value == 0 && frac_value == 0) || (other.int_value == 0 && other.frac_value == 0)) {
+            return FixedPoint(0);
+        }
         // Get the sign of the result
         bool new_sign = sign ^ other.sign;
+
+        // Check for overflow
+        if (int_value >= (1 << (int_length - 1)) || other.int_value >= (1 << (int_length - 1))) {
+            puts("Multiply Integer overflow!");
+            printf("%s * %s\n", to_string().c_str(), other.to_string().c_str());
+            
+            // Just return the max value
+            printf("JUST RETURN %s\n", FixedPoint(new_sign, int_mask, frac_mask).to_string().c_str());
+            return FixedPoint(new_sign, int_mask, frac_mask);
+        }
 
         uint64_t self_val = (int_value << frac_length) | frac_value,
                  other_val =  (other.int_value << frac_length) | other.frac_value;
@@ -493,12 +519,26 @@ public:
         return FixedPoint(new_sign, new_int, new_frac);
     }
     FixedPoint mul(int other_val) const {
+        // If the other value is 0, return 0
+        if (other_val == 0) {
+            return FixedPoint(0);
+        }
+        bool new_sign = sign ^ (other_val < 0);
+        // Check for overflow
+        if (int_value >= (1 << (int_length - 1)) || other_val >= (1 << (int_length - 1))) {
+            puts("Multiply Integer overflow!");
+            printf("%s * %d\n", to_string().c_str(), other_val);
+            //exit(1);
+            // Just return the max value
+            printf("JUST RETURN %s\n", FixedPoint(new_sign, int_mask, frac_mask).to_string().c_str());
+            return FixedPoint(new_sign, int_mask, frac_mask);
+        }
         uint64_t self_val = (int_value << frac_length) | frac_value;
         __uint128_t self_val_128 = self_val;
         __uint128_t new_val = self_val_128 * (other_val << frac_length);
         uint64_t new_int = new_val >> frac_length,
                  new_frac = new_val & frac_mask;
-        return FixedPoint(sign, new_int, new_frac);
+        return FixedPoint(new_sign, new_int, new_frac);
     }
     friend FixedPoint mul(const FixedPoint& fp1, const FixedPoint& fp2) {
         return fp1.mul(fp2);
@@ -540,6 +580,12 @@ public:
         // Get the sign of the result
         bool new_sign = sign ^ other.sign;
 
+        // Check for division by zero
+        if (other.int_value == 0 && other.frac_value == 0) {
+            puts("Division by zero!");
+            exit(1);
+        }
+
         uint64_t self_val = (int_value << frac_length) | frac_value,
                  other_val =  (other.int_value << frac_length) | other.frac_value;
         
@@ -551,6 +597,10 @@ public:
         return FixedPoint(new_sign, new_int, new_frac);
     }
     FixedPoint div(int other_val) const {
+        if (other_val == 0) {
+            puts("Division by zero!");
+            exit(1);
+        }
         uint64_t self_val = (int_value << frac_length) | frac_value;
         __uint128_t self_val_128 = (self_val << frac_length);
         __uint128_t new_val = self_val_128 / (other_val << frac_length);

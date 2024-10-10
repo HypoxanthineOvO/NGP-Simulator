@@ -6,7 +6,11 @@
 
 
 std::string PATH = "./configs/base.json";
-int RESOLITION = 800;
+#ifdef RESOLUTION_
+int RESOLUTION = RESOLUTION_;
+#else
+int RESOLUTION = 800;
+#endif
 std::string NAME = "lego";
 std::string DATA_PATH;
 int ID = 0;
@@ -42,7 +46,7 @@ int main(int argc, char** argv) {
 
     /* Generate Camera and Image */
     std::shared_ptr<Image> img = 
-        std::make_shared<Image>(RESOLITION, RESOLITION);
+        std::make_shared<Image>(RESOLUTION, RESOLUTION);
     std::shared_ptr<Camera> camera =
         std::make_shared<Camera>(
             camera_configs, img, ID

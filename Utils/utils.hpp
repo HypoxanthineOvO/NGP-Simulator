@@ -9,9 +9,8 @@
 
 #include "nlohmann/json.hpp"
 #include "FixedPoint.hpp"
+#include "MACROS.hpp"
 
-
-#define FIXEDPOINT
 
 using Vec2f = Eigen::Vector2f;
 using Vec2i = Eigen::Vector2i;
@@ -161,7 +160,7 @@ namespace utils {
 namespace QuantNGP {
 	using RMData = float;
 	#ifdef FIXEDPOINT
-	using HashData = FixedPoint<31, 32>;
+	using HashData = FixedPoint<INT_LEN, FRAC_LEN>;
 	#else
 	using HashData = float;
 	#endif
