@@ -405,9 +405,6 @@ public:
         if (other_sign) {
             other_val = ~other_val + 1;
         }
-        self_val |= (self_sign << (int_length + frac_length));
-        other_val |= (other_sign << (int_length + frac_length));
-
         
         // Show the binary value of self_val and other_val
         uint64_t new_val = self_val + other_val;
@@ -498,6 +495,14 @@ public:
         // Get the sign of the result
         bool new_sign = sign ^ other.sign;
 
+        // Check for overflow
+        if (int_value >= (1 << (int_length)) || other.int_value >= (1 << (int_length))) {
+            puts("Overflow!");
+            printf("%s * %s\n", to_string().c_str(), other.to_string().c_str());
+
+            // Only return the max value with sign
+            return FixedPoint(new_sign, int_mask, frac_mask);
+        }
 
         uint64_t self_val = (int_value << frac_length) | frac_value,
                  other_val =  (other.int_value << frac_length) | other.frac_value;
@@ -515,6 +520,15 @@ public:
             return FixedPoint(0);
         }
         bool new_sign = sign ^ (other_val < 0);
+
+        // Check for overflow
+        if (int_value >= (1 << (int_length - 1)) || std::abs(other_val) >= (1 << (int_length - 1))) {
+            puts("Overflow!");
+            printf("%s * %d\n", to_string().c_str(), other_val);
+
+            // Only return the max value with sign
+            return FixedPoint(new_sign, int_mask, frac_mask);
+        }
 
         uint64_t self_val = (int_value << frac_length) | frac_value;
         __uint128_t self_val_128 = self_val;
@@ -539,6 +553,12 @@ public:
         return FixedPoint(val) * fp;
     }
     friend FixedPoint operator*(const FixedPoint& fp, double val) {
+        return fp * FixedPoint(val);
+    }    
+    friend FixedPoint operator*(float val, const FixedPoint& fp) {
+        return FixedPoint(val) * fp;
+    }
+    friend FixedPoint operator*(const FixedPoint& fp, float val) {
         return fp * FixedPoint(val);
     }
     friend FixedPoint operator*(const FixedPoint& fp, int val) {
