@@ -27,12 +27,7 @@ public:
     FixedPoint(float val): 
         int_length(integer), frac_length(fraction),
         int_mask((1 << integer) - 1), frac_mask((1 << fraction) - 1) {
-        // Check for initialize overflow
-        if (std::abs(val) >= (1 << (integer))) {
-            puts("Initialize overflow!");
-            printf("Initialize value: %f, but the max value is %f\n", val, (1 << (integer)));
-            exit(1);
-        }
+        
         sign = (val < 0);
         float abs_val = std::abs(val);
         float val_int = std::floor(abs_val), val_frac = abs_val - val_int;
@@ -47,12 +42,7 @@ public:
     FixedPoint(double val):
         int_length(integer), frac_length(fraction),
         int_mask((1 << integer) - 1), frac_mask((1 << fraction) - 1) {
-        // Check for initialize overflow
-        if (std::abs(val) >= (double)(1 << (integer))) {
-            puts("Initialize overflow!");
-            printf("Initialize value: %lf, but the max value is %lf\n", val, (1 << (integer)));
-            exit(1);
-        }
+        
         sign = (val < 0);
         double abs_val = std::abs(val);
         double val_int = std::floor(abs_val), val_frac = abs_val - val_int;
@@ -165,12 +155,24 @@ public:
         int rorate = int_length;
         uint64_t frac_x = frac_value, int_x = int_value;
 
-        uint64_t exp_frac_pos[32], exp_frac_neg[32];
-        for (int i = 0; i < 32; i++) {
+        // FOR DEBUG
+        double frac_x_d = static_cast<double>(frac_x) / static_cast<double>(1 << frac_length),
+               int_x_d = static_cast<double>(int_x);
+        double x = int_x_d + frac_x_d;
+        if (sign) x = -x;
+        // printf("FRAC_x: %f, INT_x: %f | ", frac_x_d, int_x_d);
+        // printf("ORGINAL X: %s | ", to_string().c_str());
+        // printf("FP X: %f\n", x);
+        // printf("EXP X: %f\n", std::exp(x));
+        double exp_x = std::exp(x);
+        return FixedPoint(exp_x);
+        
+        uint64_t exp_frac_pos[64], exp_frac_neg[64];
+        for (int i = 0; i < 64; i++) {
             exp_frac_pos[i] = std::round(std::exp(1.0 / (1 << (i + 1))) * (1 << frac_length));
             exp_frac_neg[i] = std::round(std::exp(-1.0 / (1 << (i + 1))) * (1 << frac_length));
         }
-        uint64_t exp_int_pos[32], exp_int_neg[32];
+        uint64_t exp_int_pos[64], exp_int_neg[64];
         for (int i = 0; i < int_length; i++) {
             exp_int_pos[i] = std::round(std::exp(1 << i) * (1 << frac_length));
             exp_int_neg[i] = std::round(std::exp(-1 << i) * (1 << frac_length));
@@ -212,6 +214,14 @@ public:
         return fp.exp();
     };
     FixedPoint sigmoid() const {
+        // FOR DEBUG
+        double frac_x_d = static_cast<double>(frac_value) / static_cast<double>(1 << frac_length),
+               int_x_d = static_cast<double>(int_value);
+        double xx = int_x_d + frac_x_d;
+        if (sign) xx = -xx;
+        double sigmoid_x = 1.0 / (1.0 + std::exp(-xx));
+        return FixedPoint(sigmoid_x);
+
         FixedPoint x(std::move(*this));
         FixedPoint result(0);
         if (frac_length < 3) {
@@ -662,7 +672,7 @@ public:
         }
     };
     bool operator<=(const FixedPoint& other) const {
-        return *this < other || *this == other;
+        return (*this < other) || (*this == other);
     };
     bool operator>(const FixedPoint& other) const {
         return !(*this <= other);
@@ -726,7 +736,7 @@ public:
     float to_float() const {
         // Translate the FixedPoint to float value
         float val = static_cast<float>(int_value);
-        float frac = static_cast<float>(frac_value) / (1 << frac_length);
+        float frac = static_cast<float>(frac_value) / static_cast<float>(1 << frac_length);
         return sign ? -(val + frac) : val + frac;
     }
 private:

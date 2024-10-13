@@ -84,5 +84,6 @@ int main(int argc, char** argv) {
     sim.loadParameters("./snapshots/Hash19_Float/" + NAME + ".msgpack");
     sim.render();
     sim.printHistory();
+    puts("Simulation Finished");
     return 0;
 }

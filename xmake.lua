@@ -16,20 +16,16 @@ target("NGP-Simulator")
         "QModules/HashEncoding",
         "QModules/MLP",
         "QModules/SHEncoding",
-        --"Modules/Camera",
-        --"Modules/HashEncoding",
-        --"Modules/MLP",
-        --"Modules/SHEncoding",
         "Utils/",
         "Utils/Image"
         }, {public = true}
     )
     add_files({
-        "Modules/Camera/*.cpp",
-        "Modules/HashEncoding/*.cpp",
-        "Modules/MLP/*.cpp",
+        "QModules/Camera/*.cpp",
+        "QModules/HashEncoding/*.cpp",
+        "QModules/MLP/*.cpp",
+        "QModules/SHEncoding/*.cpp",
         "Utils/Image/image.cpp",
-        "Modules/SHEncoding/*.cpp"
     })
     add_files("NGP_Simulator.cpp")
 
@@ -41,29 +37,29 @@ target("NGP-Sim")
 
     set_targetdir(".")
 
-target("QModule")
-    add_packages(depends, {public = true})
-    set_kind("static")
+-- target("QModule")
+--     add_packages(depends, {public = true})
+--     set_kind("static")
 
-    add_includedirs({
-        "QModules/Camera",
-        "QModules/HashEncoding",
-        "QModules/MLP",
-        "QModules/SHEncoding",
-        "Utils/",
-        "Utils/Image"
-        }, {public = true}
-    )
-    add_files({
-        "QModules/Camera/*.cpp",
-        "QModules/HashEncoding/*.cpp",
-        "QModules/MLP/*.cpp",
-        "Utils/Image/image.cpp",
-        "QModules/SHEncoding/*.cpp"
-    })
+--     add_includedirs({
+--         "QModules/Camera",
+--         "QModules/HashEncoding",
+--         "QModules/MLP",
+--         "QModules/SHEncoding",
+--         "Utils/",
+--         "Utils/Image"
+--         }, {public = true}
+--     )
+--     add_files({
+--         "QModules/Camera/*.cpp",
+--         "QModules/HashEncoding/*.cpp",
+--         "QModules/MLP/*.cpp",
+--         "Utils/Image/image.cpp",
+--         "QModules/SHEncoding/*.cpp"
+--     })
 
-target("QTest")
-    add_deps("QModule")
-    set_kind("binary")
-    add_files("QModuleTest.cpp")
-    set_targetdir(".")
+-- target("QTest")
+--     add_deps("QModule")
+--     set_kind("binary")
+--     add_files("QModuleTest.cpp")
+--     set_targetdir(".")
