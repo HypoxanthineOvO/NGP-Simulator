@@ -155,35 +155,25 @@ public:
         int rorate = int_length;
         uint64_t frac_x = frac_value, int_x = int_value;
 
-        // FOR DEBUG
-        double frac_x_d = static_cast<double>(frac_x) / static_cast<double>(1 << frac_length),
-               int_x_d = static_cast<double>(int_x);
-        double x = int_x_d + frac_x_d;
-        if (sign) x = -x;
-        // printf("FRAC_x: %f, INT_x: %f | ", frac_x_d, int_x_d);
-        // printf("ORGINAL X: %s | ", to_string().c_str());
-        // printf("FP X: %f\n", x);
-        // printf("EXP X: %f\n", std::exp(x));
-        double exp_x = std::exp(x);
-        return FixedPoint(exp_x);
-        
-        uint64_t exp_frac_pos[64], exp_frac_neg[64];
-        for (int i = 0; i < 64; i++) {
+        uint64_t exp_frac_pos[32], exp_frac_neg[32];
+        for (int i = 0; i < 32; i++) {
             exp_frac_pos[i] = std::round(std::exp(1.0 / (1 << (i + 1))) * (1 << frac_length));
             exp_frac_neg[i] = std::round(std::exp(-1.0 / (1 << (i + 1))) * (1 << frac_length));
         }
-        uint64_t exp_int_pos[64], exp_int_neg[64];
+        uint64_t exp_int_pos[32], exp_int_neg[32];
         for (int i = 0; i < int_length; i++) {
             exp_int_pos[i] = std::round(std::exp(1 << i) * (1 << frac_length));
             exp_int_neg[i] = std::round(std::exp(-1 << i) * (1 << frac_length));
         }
-        uint64_t expx_int = 1, expx_frac = 1;
+        uint64_t expx_int = 1 << frac_length, expx_frac = 1 << frac_length;
         for (int i = 0; i < frac_length; i++) {
             if (frac_x >> (frac_length - i - 1) & 1) {
                 if (sign) {
                     expx_frac *= exp_frac_neg[i];
+                    expx_frac = expx_frac >> frac_length;
                 } else {
                     expx_frac *= exp_frac_pos[i];
+                    expx_frac = expx_frac >> frac_length;
                 }
             }
         }
@@ -196,8 +186,10 @@ public:
                 if (int_x & (1 << i)) {
                     if (sign) {
                         expx_int *= exp_int_neg[i];
+                        expx_int = expx_int >> frac_length;
                     } else {
                         expx_int *= exp_int_pos[i];
+                        expx_int = expx_int >> frac_length;
                     }
                 }
             }
@@ -214,14 +206,6 @@ public:
         return fp.exp();
     };
     FixedPoint sigmoid() const {
-        // FOR DEBUG
-        double frac_x_d = static_cast<double>(frac_value) / static_cast<double>(1 << frac_length),
-               int_x_d = static_cast<double>(int_value);
-        double xx = int_x_d + frac_x_d;
-        if (sign) xx = -xx;
-        double sigmoid_x = 1.0 / (1.0 + std::exp(-xx));
-        return FixedPoint(sigmoid_x);
-
         FixedPoint x(std::move(*this));
         FixedPoint result(0);
         if (frac_length < 3) {
@@ -231,15 +215,15 @@ public:
         if (frac_length < 5) {
             // frac_length < 5
             if (int_length >= 2 && x.abs() >= FixedPoint(4.0))  result = FixedPoint(1.0);
-            else if (x.abs() >= FixedPoint(1.0))                result = FixedPoint(0.125) * x + FixedPoint(0.625);
-            else                                                result = FixedPoint(0.25) * x + FixedPoint(0.5);
+            else if (x.abs() >= FixedPoint(1.0))                result = FixedPoint(0.125) * x.abs() + FixedPoint(0.625);
+            else                                                result = FixedPoint(0.25) * x.abs() + FixedPoint(0.5);
         }
         else {
             // frac_length >= 5
             if (int_length >= 3 && x.abs() >= FixedPoint(5.0))          result = FixedPoint(1.0);
-            else if (int_length >= 2 && x.abs() >= FixedPoint(2.375))   result = FixedPoint(0.03125) * x + FixedPoint(0.84375);
-            else if (int_length >= 1 && x.abs() >= FixedPoint(1.0))     result = FixedPoint(0.125) * x + FixedPoint(0.625);
-            else                                                        result = FixedPoint(0.25) * x + FixedPoint(0.5);
+            else if (int_length >= 2 && x.abs() >= FixedPoint(2.375))   result = FixedPoint(0.03125) * x.abs() + FixedPoint(0.84375);
+            else if (int_length >= 1 && x.abs() >= FixedPoint(1.0))     result = FixedPoint(0.125) * x.abs() + FixedPoint(0.625);
+            else                                                        result = FixedPoint(0.25) * x.abs() + FixedPoint(0.5);
         }
         // For negative value, sigmoid(-x) = 1 - sigmoid(x)
         if (sign) result = FixedPoint(1.0) - result;
