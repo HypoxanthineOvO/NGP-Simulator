@@ -140,11 +140,9 @@ void Simulator::render() {
             Eigen::Matrix<QuantNGP::VRData, 3, 1> color_raw = history.rgbs[i * img->getResolution().y() + j];
             #ifdef FIXEDPOINT
             Vec3f color = Vec3f(color_raw.x().to_float(), color_raw.y().to_float(), color_raw.z().to_float());
-            printf("COLOR RAW: %s, %s, %s | ", color_raw.x().to_string().c_str(), color_raw.y().to_string().c_str(), color_raw.z().to_string().c_str());
             #else
             Vec3f color = Vec3f(color_raw.x(), color_raw.y(), color_raw.z());
             #endif
-            printf("Color: %f %f %f\n", color.x(), color.y(), color.z());
             img->setPixel(i, img->getResolution().y() - 1 - j, color);
         }
     }
